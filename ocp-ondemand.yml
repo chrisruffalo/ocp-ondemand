@@ -1,0 +1,30 @@
+---
+# playbook to create OCP on demand in a VPC in EC2 with 
+# a configurable number of nodes, a HA gitlab instance,
+# and an HA multi-tenant Eclipse CHE instance
+# see more here: https://docs.openshift.com/container-platform/3.4/install_config/install/advanced_install.html#running-the-advanced-installation
+
+# create ec2 infrastructure (from localhost, making only needed changes to get the ec2 client running)
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  roles: 
+    - "ec2_spinup"
+
+# configure bastion host to recieve and execute commands
+- hosts: bastion
+  roles: 
+    - "common"
+    - "ec2_bastion"
+
+# configure rhel hosts
+- hosts: rhel
+  roles:
+    - "rhn" # need to attach to rhn before attending to uncommon tasks
+    - "common"
+    - "rhel"
+
+# cause bastion host to start ocp install
+#- hosts: bastion
+#  roles: 
+#    - "ocp"

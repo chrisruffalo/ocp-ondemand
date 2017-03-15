@@ -1,0 +1,34 @@
+---
+# instance name
+instance_name: "ocp_ondemand"
+
+# aws access
+aws_secret_key: "{{ vault_aws_secret_key }}"
+aws_access_key: "{{ vault_aws_access_key }}"
+
+# region for creation
+aws_region: "us-east-1"
+
+# ami
+rhel7_ami: "ami-b63769a1"
+centos7_ami: "ami-6d1c2007"
+
+# ami credentials
+bastion_user: "centos"
+ocp_user: "ec2-user"
+
+# rhn credentials
+rhn_username: "{{ vault_rhn_username }}"
+rhn_password: "{{ vault_rhn_password }}"
+rhn_pool: "{{ vault_rhn_pool }}"
+
+# numbers of each available node-type
+master_count: 3 # need 3 to prevent split brain, or go with one
+infra_count: 2 # need 2+
+node_count: 3 # how many hosts you want
+
+# node sizes
+bastion_size: "t2.small" #"t2.medium"
+master_size: "t2.medium" #"m3.large"
+infra_size: "t2.medium" #c3.2xlarge"
+node_size: "t2.medium" #m4.4xlarge"

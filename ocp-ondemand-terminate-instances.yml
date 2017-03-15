@@ -1,0 +1,145 @@
+---
+# terminate instances
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    # make sure boto and boto3 are installed for aws/ec2 tools
+    - name: "Install AWS client dependencies"
+      pip:
+        name: 
+          - "boto"
+          - "boto3"
+          - "pyOpenSSL"
+    
+    # terminate instance if previous instance exists
+    - name: "Gather previous instance details if any exist"
+      ec2_remote_facts:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"
+        filters:
+          "tag:instance": "{{ instance_name }}"
+      register: previous_instance_ec2_facts
+    
+    - name: "Terminate instances that were previously launched"
+      ec2:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"
+        state: absent
+        instance_ids: "{{ previous_instance_ec2_facts.instances | map(attribute = 'id') | list }}"
+      when: previous_instance_ec2_facts.instances 
+
+    - name: "Terminate master load balancer"
+      ec2_elb_lb:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"
+        name: "{{ instance_name | regex_replace('[_]','-') }}-master-lb"
+        state: absent
+
+    - name: "Terminate router balancer"
+      ec2_elb_lb:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"
+        name: "{{ instance_name | regex_replace('[_]','-') }}-router-lb"
+        state: absent
+
+    # delete ds
+    - name: "Delete DS"
+      ds:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"        
+        short_name: "{{ instance_name }}"
+        state: absent
+
+    # get information about VPC
+    - name: "Get information about existing VPCs"
+      ec2_vpc_net_facts:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"
+        filters:
+          "tag:Name": "{{ instance_name }}-vpc"
+      register: vpc_net_facts
+
+    # get information about nats
+    #- name: "Get NAT gateway information"
+    #  ec2_vpc_nat_gateway_facts:
+    #    access_key: "{{ aws_access_key }}"
+    #    secret_key: "{{ aws_secret_key }}"
+    #    region: "{{ aws_region }}"
+    #    filters:
+    #      vpc-id: "{{ vpc_net_facts.vpcs[0].id }}"
+    #  when: vpc_net_facts.vpcs          
+    #  register: vpc_nat_facts
+
+    # delete options
+    #- name: "Delete NAT gateways"
+    #  ec2_vpc_nat_gateway:
+    #    access_key: "{{ aws_access_key }}"
+    #    secret_key: "{{ aws_secret_key }}"
+    #    region: "{{ aws_region }}"
+    #    release_eip: yes
+    #    nat_gateway_id: "{{ vpc_nat_facts.id }}"
+    #  when: vpc_net_facts.vpcs
+
+    # release ips (??)
+
+    # get information about subnets
+    - name: "Get subnet information"
+      ec2_vpc_subnet_facts:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"
+        filters:
+          vpc-id: "{{ vpc_net_facts.vpcs[0].id }}"
+      when: vpc_net_facts.vpcs
+      register: vpc_subnet_facts
+ 
+    - name: "Terminate instance VPC subnets"
+      ec2_vpc_subnet:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"
+        state: absent
+        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+        cidr: "{{ item.cidr_block }}"
+      when: vpc_net_facts.vpcs
+      with_items: "{{ vpc_subnet_facts.subnets }}"
+
+    # get information to delete route tables (and other incidental artifacts)
+    - name: "Get details about existing routing tables"
+      ec2_vpc_route_table_facts:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"        
+        filters:
+          "tag:instance": "{{ instance_name }}"
+      when: vpc_net_facts.vpcs    
+      register: route_table_facts    
+
+    - name: "Delete routing tables"
+      ec2_vpc_route_table:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"
+        state: absent
+        lookup: id
+        route_table_id: "{{ item.id }}"
+        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+      with_items: "{{ route_table_facts.route_tables }}"
+      when: route_table_facts.route_tables
+
+    # everything is gone, terminate VPC
+    - name: "Terminate instance VPC"
+      ec2_vpc_net:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        state: absent
+        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+        region: "{{ aws_region }}"
+      when: vpc_net_facts.vpcs        

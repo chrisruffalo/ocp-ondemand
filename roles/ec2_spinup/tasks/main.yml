@@ -1,0 +1,460 @@
+---
+# make sure boto and boto3 are installed for aws/ec2 tools
+- name: "Install AWS client dependencies"
+  pip:
+    name: 
+      - "boto"
+      - "boto3"
+      - "pyOpenSSL"
+
+# needed to begin creating the layout for the rest of the items    
+- name: "Provision EC2 VPC network"
+  ec2_vpc_net:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: present
+    name: "{{ instance_name }}-vpc"
+    cidr_block: 10.0.0.0/16
+    tags:
+      purpose: "ocp"
+      instance: "{{ instance_name }}"
+    dns_support: true
+    dns_hostnames: true
+  register: vpc_result
+
+- name: "Create vpc subnets"
+  ec2_vpc_subnet:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    cidr: "{{ item.cidr }}"
+    az: "{{ item.az }}"
+    resource_tags:
+      Name: "{{ instance_name }}-{{ item.name }}"
+      instance: "{{ instance_name }}"
+  register: subnet_result
+  with_items:
+    - cidr: 10.0.1.0/24
+      az: "{{ aws_region}}a"
+      name: "public-1"
+    - cidr: 10.0.2.0/24
+      az: "{{ aws_region}}b"
+      name: "public-2"
+    - cidr: 10.0.3.0/24
+      az: "{{ aws_region}}a"
+      name: "private-1"
+    - cidr: 10.0.4.0/24
+      az: "{{ aws_region}}b"
+      name: "private-2"                  
+
+# create igd for internet connectivity for public hosts
+- name: "Create IGW"
+  ec2_vpc_igw:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    state: present
+  register: igw
+
+# create private NAT endpoint on public IP
+- name: "Create NAT gatway with associating EIP into public subnet and using it as a routing target"
+  ec2_vpc_nat_gateway:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    state: present
+    subnet_id: "{{ subnet_result.results[1].subnet.id }}"
+    wait: yes
+    region: "{{ aws_region }}"
+    if_exist_do_not_create: true
+  register: nat_gateway
+
+# route from all public subnets to 0.0.0.0/0 through the IGW
+- name: "Create routing destination from public subnets to outside (via internet gateway)"
+  ec2_vpc_route_table:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    tags:
+      Name: "{{ instance_name }}-public"
+      instance: "{{ instance_name }}"
+    subnets:
+      - "{{ subnet_result.results[0].subnet.cidr_block }}"
+      - "{{ subnet_result.results[1].subnet.cidr_block }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ igw.gateway_id }}"
+  register: nat_route_table    
+
+# route all other traffic through the NAT gateway for private subnets
+- name: "Create routing destination from VPC subnets to outside"
+  ec2_vpc_route_table:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    tags:
+      Name: "{{ instance_name }}-private"
+      instance: "{{ instance_name }}"
+    subnets:
+      - "{{ subnet_result.results[2].subnet.cidr_block }}"
+      - "{{ subnet_result.results[3].subnet.cidr_block }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ nat_gateway.nat_gateway_id }}"
+  register: igw_route_table
+
+# create security groups
+- name: "Create SSH-allowed security group"
+  ec2_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    description: "allows SSH access"        
+    name: "{{ instance_name }}-ssh-allowed"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    rules:
+      - proto: tcp
+        to_port: 22
+        from_port: 22
+        cidr_ip: 0.0.0.0/0
+
+- name: "Create HTTP/HTTPS-allowed security group"
+  ec2_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    description: "allows HTTP and HTTPS access"        
+    name: "{{ instance_name }}-http-https-allowed"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    rules:
+      - proto: tcp
+        to_port: 80
+        from_port: 80
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp
+        to_port: 443
+        from_port: 443
+        cidr_ip: 0.0.0.0/0
+
+
+- name: "Create internal allow-all security group"
+  ec2_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    description: "allows HTTP and HTTPS access"        
+    name: "{{ instance_name }}-all-internal-allowed"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    rules:
+      - proto: all
+        cidr_ip: 10.0.0.0/16
+
+# create ec2 key
+- name: "Check if EC2 keypair private key exists"
+  stat:
+    path: "static/{{ instance_name }}.id_rsa"
+  register: keypair_stat
+
+- name: "Create EC2 keypair for using with hosts / jump host"
+  ec2_key:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    name: "{{ instance_name }}"
+    state: present
+    region: "{{ aws_region }}"
+    wait: true
+  when: not keypair_stat.stat.exists
+  register: keypair
+
+# save key
+- name: "Persist private key to 'static' assets directory"
+  copy:
+    dest: "static/{{ instance_name }}.id_rsa"
+    content: "{{ keypair.key.private_key }}"
+    mode: 0400 # only readable by current user
+  when: keypair.changed
+
+- name: "Delete old public key if keypair changed"
+  file:
+    dest: "static/{{ instance_name }}.id_rsa.pub"
+    state: absent
+  when: keypair.changed
+
+- name: "Create public key from private key material"
+  shell: "ssh-keygen -y -f static/{{ instance_name }}.id_rsa > static/{{ instance_name }}.id_rsa.pub"
+  args:
+    creates: "static/{{ instance_name }}.id_rsa.pub"
+
+# create the bastion/jump host and attach elastic ip
+- name: "Create bastion host"
+  ec2:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    instance_tags: 
+      Name: "{{ instance_name }}-bastion"
+      short_name: "bastion"
+      purpose: "ocp"
+      location: "public"
+      os: "centos7"
+      instance: "{{ instance_name }}"
+    count_tag: 
+      Name: "{{ instance_name }}-bastion" # use the name as the key for the exact count
+    exact_count: 1 # there should only ever be 1 running
+    instance_type: "{{ bastion_size }}"
+    region: "{{ aws_region }}"
+    assign_public_ip: yes
+    group:
+      - "{{ instance_name }}-ssh-allowed"
+      - "{{ instance_name }}-all-internal-allowed"
+    image: "{{ centos7_ami }}" # use a centos7 image
+    vpc_subnet_id: "{{ subnet_result.results[0].subnet.id }}" # launch in public subnet
+    key_name: "{{ instance_name }}"
+    wait: true
+  register: bastion_result
+
+# add bastion host to ansible run
+- name: "Add bastion host to list of hosts"
+  add_host:
+    name: "{{ bastion_result.tagged_instances[0].public_ip }}"
+    ansible_ssh_private_key_file: "static/{{ instance_name }}.id_rsa"
+    ansible_ssh_user: "{{ bastion_user }}"
+    ansible_become: true
+    groups: 
+      - "{{ instance_name }}"
+      - "launched"
+      - "bastion"
+
+# create OCP target hosts
+- name: "Create master/etcd hosts"
+  ec2:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    instance_tags: 
+      Name: "{{ instance_name }}-master-{{ item.group }}"
+      type: "master"
+      purpose: "ocp"
+      location: "public"
+      os: "rhel7"
+      instance: "{{ instance_name }}"
+      availability_group: "{{ item.group }}"
+    count_tag:
+      Name: "{{ instance_name }}-master-{{ item.group }}" # use the name as the key for the exact count
+    exact_count: "{{ item.count }}" # there should only ever be this number running
+    instance_type: "{{ master_size }}"
+    region: "{{ aws_region }}"
+    assign_public_ip: yes
+    group:
+      - "{{ instance_name }}-ssh-allowed"
+      - "{{ instance_name }}-http-https-allowed"
+      - "{{ instance_name }}-all-internal-allowed"          
+    image: "{{ rhel7_ami }}" # use a rhel7 image
+    vpc_subnet_id: "{{ item.subnet }}" # launch in public subnet
+    key_name: "{{ instance_name }}"
+    wait: true
+  with_items:
+    - count: "{{ (master_count / 2.0) | round(0, 'ceil') | int }}"
+      group: "a"
+      subnet: "{{ subnet_result.results[0].subnet.id }}"
+    - count: "{{ (master_count / 2.0) | round(0, 'floor') | int }}"
+      group: "b"
+      subnet: "{{ subnet_result.results[1].subnet.id }}"
+  register: master_result
+
+- name: "Create infrastructure hosts"
+  ec2:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    instance_tags: 
+      Name: "{{ instance_name }}-infrastructure-{{ item.group }}"
+      type: "infrastructure"
+      purpose: "ocp"
+      location: "private"
+      os: "rhel7"
+      instance: "{{ instance_name }}"
+      availability_group: "{{ item.group }}"
+    count_tag: 
+      Name: "{{ instance_name }}-infrastructure-{{ item.group }}" # use the name as the key for the exact count
+    exact_count: "{{ item.count }}" # there should only ever be this number running
+    instance_type: "{{ infra_size }}"
+    region: "{{ aws_region }}"
+    assign_public_ip: no # no public access
+    group:
+      - "{{ instance_name }}-all-internal-allowed"
+    image: "{{ rhel7_ami }}" # use a rhel7 image
+    vpc_subnet_id: "{{ item.subnet }}" # launch in private subnet
+    key_name: "{{ instance_name }}"
+    wait: true
+  when: item.count > 0    
+  with_items:
+    - count: "{{ (infra_count / 2.0) | round(0, 'ceil') | int }}"
+      group: "a"
+      subnet: "{{ subnet_result.results[2].subnet.id }}"
+    - count: "{{ (infra_count / 2.0) | round(0, 'floor') | int }}"
+      group: "b"
+      subnet: "{{ subnet_result.results[3].subnet.id }}"
+  register: infra_result
+
+- name: "Create hosting node hosts"
+  ec2:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    instance_tags: 
+      Name: "{{ instance_name }}-node-{{ item.group }}"
+      type: "node"
+      purpose: "ocp"
+      location: "private"
+      os: "rhel7"
+      instance: "{{ instance_name }}"
+      availability_group: "{{ item.group }}"
+    count_tag: 
+      Name: "{{ instance_name }}-node-{{ item.group }}" # use the name as the key for the exact count
+    exact_count: "{{ item.count }}" # there should only ever be this number running
+    instance_type: "{{ node_size }}"
+    region: "{{ aws_region }}"
+    assign_public_ip: no # no public access
+    group:
+      - "{{ instance_name }}-all-internal-allowed"
+    image: "{{ rhel7_ami }}" # use a rhel7 image
+    vpc_subnet_id: "{{ item.subnet }}" # launch in private subnet
+    key_name: "{{ instance_name }}"
+    wait: true
+  when: item.count > 0
+  with_items:
+    - count: "{{ (node_count / 2.0) | round(0, 'ceil') | int }}"
+      group: "a"
+      subnet: "{{ subnet_result.results[2].subnet.id }}"
+    - count: "{{ (node_count / 2.0) | round(0, 'floor') | int }}"
+      group: "b"
+      subnet: "{{ subnet_result.results[3].subnet.id }}"
+  register: node_result
+
+- name: "Create instance variables"
+  set_fact:
+    master_instances: "{{ master_result.results[0].tagged_instances + master_result.results[1].tagged_instances }}"
+    infra_instances: "{{ infra_result.results[0].tagged_instances + infra_result.results[1].tagged_instances }}"
+    node_instances: "{{ node_result.results[0].tagged_instances + node_result.results[1].tagged_instances }}"
+
+- name: "Wait for bastion host to come up"
+  wait_for:
+    host: "{{ bastion_result.tagged_instances[0].public_ip }}"
+    port: 22
+
+- name: "Wait for master host(s) to come up (because these are public-available and we can)"
+  wait_for:
+    host: "{{ item.public_ip }}"
+    port: 22
+  with_items: "{{ master_instances }}"
+
+# create directory server
+- name: "Create DS"
+  ds:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    name: "{{ instance_name | regex_replace('[_-]','.') }}"
+    short_name: "{{ instance_name }}"
+    password: "SUP3r_s3curE!"
+    vpcId: "{{ vpc_result.vpc.id }}"
+    subnets:
+      - "{{ subnet_result.results[0].subnet.id }}"
+      - "{{ subnet_result.results[3].subnet.id }}"
+  register: ds_result
+
+# add various hosts to different groups in ansible
+- name: "Add masters to list of hosts"
+  add_host:
+    name: "{{ item.public_ip }}"
+    ansible_ssh_private_key_file: "static/{{ instance_name }}.id_rsa"
+    ansible_ssh_user: "{{ ocp_user }}"
+    ansible_become: true
+    groups: 
+      - "{{ instance_name }}"
+      - "masters"
+      - "etcd"
+      - "rhel"
+  with_items: "{{ master_instances }}"
+
+- name: "Add infrastructure to list of hosts"
+  add_host:
+    name: "{{ item.private_ip }}"
+    ansible_ssh_user: "{{ ocp_user }}" 
+    ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ bastion_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
+    ansible_become: true
+    groups: 
+      - "{{ instance_name }}"
+      - "infra"
+      - "rhel"
+      - "tunneled"
+  with_items: "{{ infra_instances }}"
+
+- name: "Add hosting nodes to list of hosts"
+  add_host:
+    name: "{{ item.private_ip }}"
+    ansible_ssh_user: "{{ ocp_user }}" 
+    ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ bastion_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
+    ansible_become: true
+    openshift_node_labels:
+      region: "primary"
+      zone: "availability-group-{{ item.tags.availability_group }}"
+    groups: 
+      - "{{ instance_name }}"
+      - "nodes"
+      - "rhel"
+      - "tunneled"
+  with_items: "{{ node_instances }}"
+
+# we can create the load balancer for the masters
+- name: "Create master load balancer"
+  ec2_elb_lb:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"  
+    name: "{{ instance_name | regex_replace('[_]','-') }}-master-lb"
+    state: present
+    subnets: 
+      - "{{ subnet_result.results[0].subnet.id }}"
+    instance_ids: "{{ master_instances | map(attribute = 'id') | list }}"
+    listeners:
+    - protocol: http
+      load_balancer_port: 80
+      instance_port: 80
+  register: master_lb_result
+
+# and also a LB for the infrastructure nodes
+- name: "Create load infrastructure/routing load balancer"
+  ec2_elb_lb:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"  
+    name: "{{ instance_name | regex_replace('[_]','-') }}-router-lb"
+    state: present
+    subnets: 
+      - "{{ subnet_result.results[1].subnet.id }}"
+    instance_ids: "{{ infra_instances | map(attribute = 'id') | list }}"
+    listeners:
+    - protocol: http
+      load_balancer_port: 80
+      instance_port: 80
+  register: node_lb_result
+  
+# we need to keep some facts from this run
+# you can get here via: `hostvars['localhost']['ec2_info']` from elsewhere
+- name: "Maintain facts to use later in the run"
+  set_fact:
+    ec2_info:
+      masters: " {{ master_instances }}"
+      infras: "{{ infra_instances }}"
+      nodes: "{{ node_instances }}"
+      master_lb: "{{ master_lb_result }}"
+      node_lb: "{{ node_lb_result }}"
+      ds: "{{ ds_result }}"

@@ -1,0 +1,5 @@
+---
+- name: "Remote execution of OCP playbook(s)"
+  command: "ansible-playbook /opt/openshift-ansible/playbooks/byo/config.yml"
+  args:
+    chdir: "/opt/openshift-ansible"

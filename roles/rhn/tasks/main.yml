@@ -1,0 +1,4 @@
+---
+- redhat_subscription:
+    username: "{{ rhn_username }}"
+    password: "{{ rhn_password }}"

@@ -1,0 +1,55 @@
+---
+- name: "Copy id_rsa to use inside protected networks"
+  copy:
+    src: "static/{{ instance_name }}.id_rsa"
+    dest: "/root/.ssh/id_rsa"
+    mode: 0400
+
+- name: "Copy id_rsa to use inside protected networks"
+  copy:
+    src: "static/{{ instance_name }}.id_rsa"
+    dest: "/home/{{ bastion_user }}/.ssh/id_rsa"
+    owner: "{{ bastion_user }}"
+    group: "{{ bastion_user }}"
+    mode: 0400
+
+- name: "Wait for other (private network) hosts to come up so they can be managed"
+  wait_for: 
+    port: 22
+    host: "{{ item }}"
+  with_items: "{{ groups['tunneled'] }}"
+
+# pip is needed to quickly get ansible
+- name: "Install pip"
+  package:
+    name: pip
+    state: present
+
+# need to start ocp install
+- name: "Install ansible"
+  pip:
+    name: 
+      - "ansible"
+      - "pyOpenSSL"
+
+# we need this BYO playbook to continue the run
+- name: "Checkout OCP playbook for later use"
+  git:
+    repo: "https://github.com/openshift/openshift-ansible.git"
+    dest: "/opt/"
+    version: "1.4"
+
+# make sure facts are more accessible
+- name: "Move collected ec2 facts from localhost to a more convienient location"
+  set_fact:
+    ec2_info: "{{ hostvars['localhost']['ec2_info'] }}"
+
+# write the host inventory as the default ansible inventory
+- name: "Write Host Inventory"
+  template:
+    src: "hosts.j2"
+    dest: "/etc/ansible/hosts"
+    mode: 0444
+
+  
+

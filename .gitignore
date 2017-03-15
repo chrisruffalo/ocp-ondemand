@@ -1,0 +1,3 @@
+# stuff we don't want to check in
+**/vault.yml
+*.retry
