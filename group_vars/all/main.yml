@@ -1,6 +1,7 @@
 ---
 # instance name
 instance_name: "ocp_ondemand"
+safe_instance_name: "{{ instance_name | regex_replace('[_]','-') }}" # "safer" version for some places without special characters but '-'
 
 # aws access
 aws_secret_key: "{{ vault_aws_secret_key }}"
@@ -22,6 +23,12 @@ rhn_username: "{{ vault_rhn_username }}"
 rhn_password: "{{ vault_rhn_password }}"
 rhn_pool: "{{ vault_rhn_pool }}"
 
+# keycloak information
+keycloak_admin_user: "kadmin"
+keycloak_admin_password: "{{ vault_keycloak_admin_password }}"
+keycloak_db_password: "{{ vault_keycloak_db_password }}"
+keycloak_download_url: "https://downloads.jboss.org/keycloak/3.0.0.CR1/keycloak-3.0.0.CR1.tar.gz" # MUST BE TARBALL
+
 # numbers of each available node-type
 master_count: 3 # need 3 to prevent split brain, or go with one
 infra_count: 2 # need 2+
@@ -29,6 +36,17 @@ node_count: 3 # how many hosts you want
 
 # node sizes
 bastion_size: "t2.small" #"t2.medium"
-master_size: "t2.medium" #"m3.large"
-infra_size: "t2.medium" #c3.2xlarge"
-node_size: "t2.medium" #m4.4xlarge"
+master_size: "t2.medium" #"m3.large" # <- $$ EXPENSIVE $$
+infra_size: "t2.medium" #c3.2xlarge" # <- $$ EXPENSIVE $$
+node_size: "t2.medium" #m4.4xlarge" # <- $$ EXPENSIVE $$
+keycloak_size: "t2.medium"
+keycloak_rds_size: "db.t2.medium"
+
+# zone that hosting will happen from (like cloud.rain.org if you own rain.org)
+manage_host: true # set this to true if it is ok that this script creates a host name entry (does not buy or register a domain)
+                  # you will still need to set your domain servers to point to this entry from outside of amazon unless you 
+                  # use them to manage your domains.
+# the hosted zone
+hosted_zone: "{{ vault_hosted_zone }}"
+# the certificate arn for use by the ALB (application load balancer)
+certificate_arn: "{{ vault_certificate_arn }}"

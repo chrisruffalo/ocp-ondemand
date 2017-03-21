@@ -1,0 +1,261 @@
+---
+
+# create the bastion/jump host and attach elastic ip
+- name: "Create bastion host"
+  ec2:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    instance_tags: 
+      Name: "{{ instance_name }}-bastion"
+      short_name: "bastion"
+      purpose: "ocp"
+      location: "public"
+      os: "centos7"
+      instance: "{{ instance_name }}"
+    count_tag: 
+      Name: "{{ instance_name }}-bastion" # use the name as the key for the exact count
+    exact_count: 1 # there should only ever be 1 running
+    instance_type: "{{ bastion_size }}"
+    region: "{{ aws_region }}"
+    assign_public_ip: yes
+    group:
+      - "{{ instance_name }}-ssh-allowed"
+      - "{{ instance_name }}-all-internal-allowed"
+    image: "{{ centos7_ami }}" # use a centos7 image
+    vpc_subnet_id: "{{ subnets[0].subnet.id }}" # launch in public subnet
+    key_name: "{{ instance_name }}"
+    wait: true
+  register: bastion_result
+
+# add bastion host to ansible run
+- name: "Add bastion host to list of hosts"
+  add_host:
+    name: "{{ bastion_result.tagged_instances[0].public_ip }}"
+    ansible_ssh_private_key_file: "static/{{ instance_name }}.id_rsa"
+    ansible_ssh_user: "{{ bastion_user }}"
+    ansible_become: true
+    groups: 
+      - "{{ instance_name }}"
+      - "bastion"
+      - "centos"
+
+# create OCP target hosts
+- name: "Create master/etcd hosts"
+  ec2:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    instance_tags: 
+      Name: "{{ instance_name }}-master-{{ item.group }}"
+      type: "master"
+      purpose: "ocp"
+      location: "public"
+      os: "rhel7"
+      instance: "{{ instance_name }}"
+      availability_group: "{{ item.group }}"
+    count_tag:
+      Name: "{{ instance_name }}-master-{{ item.group }}" # use the name as the key for the exact count
+    exact_count: "{{ item.count }}" # there should only ever be this number running
+    instance_type: "{{ master_size }}"
+    region: "{{ aws_region }}"
+    assign_public_ip: no
+    group:
+      - "{{ instance_name }}-ssh-allowed"
+      - "{{ instance_name }}-http-https-allowed"
+      - "{{ instance_name }}-all-internal-allowed"          
+    image: "{{ rhel7_ami }}" # use a rhel7 image
+    vpc_subnet_id: "{{ item.subnet }}" # launch in public subnet
+    key_name: "{{ instance_name }}"
+    wait: true
+  with_items:
+    - count: "{{ (master_count / 2.0) | round(0, 'ceil') | int }}"
+      group: "a"
+      subnet: "{{ subnet_result.results[0].subnet.id }}"
+    - count: "{{ (master_count / 2.0) | round(0, 'floor') | int }}"
+      group: "b"
+      subnet: "{{ subnet_result.results[1].subnet.id }}"
+  register: master_result
+
+- name: "Create infrastructure hosts"
+  ec2:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    instance_tags: 
+      Name: "{{ instance_name }}-infrastructure-{{ item.group }}"
+      type: "infrastructure"
+      purpose: "ocp"
+      location: "private"
+      os: "rhel7"
+      instance: "{{ instance_name }}"
+      availability_group: "{{ item.group }}"
+    count_tag: 
+      Name: "{{ instance_name }}-infrastructure-{{ item.group }}" # use the name as the key for the exact count
+    exact_count: "{{ item.count }}" # there should only ever be this number running
+    instance_type: "{{ infra_size }}"
+    region: "{{ aws_region }}"
+    assign_public_ip: no # no public access
+    group:
+      - "{{ instance_name }}-all-internal-allowed"
+    image: "{{ rhel7_ami }}" # use a rhel7 image
+    vpc_subnet_id: "{{ item.subnet }}" # launch in private subnet
+    key_name: "{{ instance_name }}"
+    wait: true
+  when: item.count > 0    
+  with_items:
+    - count: "{{ (infra_count / 2.0) | round(0, 'ceil') | int }}"
+      group: "a"
+      subnet: "{{ subnet_result.results[2].subnet.id }}"
+    - count: "{{ (infra_count / 2.0) | round(0, 'floor') | int }}"
+      group: "b"
+      subnet: "{{ subnet_result.results[3].subnet.id }}"
+  register: infra_result
+
+- name: "Create hosting node hosts"
+  ec2:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    instance_tags: 
+      Name: "{{ instance_name }}-node-{{ item.group }}"
+      type: "node"
+      purpose: "ocp"
+      location: "private"
+      os: "rhel7"
+      instance: "{{ instance_name }}"
+      availability_group: "{{ item.group }}"
+    count_tag: 
+      Name: "{{ instance_name }}-node-{{ item.group }}" # use the name as the key for the exact count
+    exact_count: "{{ item.count }}" # there should only ever be this number running
+    instance_type: "{{ node_size }}"
+    region: "{{ aws_region }}"
+    assign_public_ip: no # no public access
+    group:
+      - "{{ instance_name }}-all-internal-allowed"
+    image: "{{ rhel7_ami }}" # use a rhel7 image
+    vpc_subnet_id: "{{ item.subnet }}" # launch in private subnet
+    key_name: "{{ instance_name }}"
+    wait: true
+  when: item.count > 0
+  with_items:
+    - count: "{{ (node_count / 2.0) | round(0, 'ceil') | int }}"
+      group: "a"
+      subnet: "{{ subnet_result.results[2].subnet.id }}"
+    - count: "{{ (node_count / 2.0) | round(0, 'floor') | int }}"
+      group: "b"
+      subnet: "{{ subnet_result.results[3].subnet.id }}"
+  register: node_result
+
+- name: "Create keycloak hosts for login and user federation"
+  ec2:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    instance_tags: 
+      Name: "{{ instance_name }}-keycloak-{{ item.group }}"
+      type: "keycloak"
+      purpose: "ocp"
+      location: "private"
+      os: "centos7"
+      instance: "{{ instance_name }}"
+      availability_group: "{{ item.group }}"
+    count_tag: 
+      Name: "{{ instance_name }}-keycloak-{{ item.group }}" # use the name as the key for the exact count
+    exact_count: "{{ item.count }}" # there should only ever be this number running
+    instance_type: "{{ keycloak_size }}"
+    region: "{{ aws_region }}"
+    assign_public_ip: no # no public access
+    group:
+      - "{{ instance_name }}-http-https-allowed"
+      - "{{ instance_name }}-all-internal-allowed"
+    image: "{{ rhel7_ami }}" # use a rhel7 image
+    vpc_subnet_id: "{{ item.subnet }}" # launch in private subnet
+    key_name: "{{ instance_name }}"
+    wait: true
+  when: item.count > 0
+  with_items:
+    - count: "1"
+      group: "a"
+      subnet: "{{ subnet_result.results[0].subnet.id }}"
+  register: keycloak_result
+
+  
+
+# variable management
+- name: "Merge variables for master instances"
+  set_fact:
+    master_instances: "{{ master_instances | default([]) + item.tagged_instances }}"
+  with_items: "{{ master_result.results }}"
+
+- name: "Merge variables for infra instances"
+  set_fact: 
+    infra_instances: "{{ infra_instances | default([]) + item.tagged_instances }}"
+  with_items: "{{ infra_result.results }}"
+
+- name: "Merge variables for node instances"
+  set_fact:
+    node_instances: "{{ node_instances | default([]) + item.tagged_instances }}"
+  with_items: "{{ node_result.results }}"    
+
+- name: "Merge variables for keycloak instances"
+  set_fact:
+    keycloak_instances: "{{ keycloak_instances | default([]) + item.tagged_instances }}"
+  with_items: "{{ keycloak_result.results }}"    
+
+- name: "Wait for bastion host to come up"
+  wait_for:
+    host: "{{ bastion_result.tagged_instances[0].public_ip }}"
+    port: 22
+
+# add various hosts to different groups in ansible
+- name: "Add masters to list of hosts"
+  add_host:
+    name: "{{ item.private_ip }}"
+    ansible_ssh_user: "{{ ocp_user }}" 
+    ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ bastion_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
+    ansible_become: true
+    groups: 
+      - "{{ instance_name }}"
+      - "masters"
+      - "etcd"
+      - "rhel"
+      - "tunneled"
+  with_items: "{{ master_instances }}"
+
+- name: "Add infrastructure to list of hosts"
+  add_host:
+    name: "{{ item.private_ip }}"
+    ansible_ssh_user: "{{ ocp_user }}" 
+    ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ bastion_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
+    ansible_become: true
+    groups: 
+      - "{{ instance_name }}"
+      - "infra"
+      - "rhel"
+      - "tunneled"
+  with_items: "{{ infra_instances }}"
+
+- name: "Add hosting nodes to list of hosts"
+  add_host:
+    name: "{{ item.private_ip }}"
+    ansible_ssh_user: "{{ ocp_user }}" 
+    ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ bastion_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
+    ansible_become: true
+    openshift_node_labels:
+      region: "primary"
+      zone: "availability-group-{{ item.tags.availability_group }}"
+    groups: 
+      - "{{ instance_name }}"
+      - "nodes"
+      - "rhel"
+      - "tunneled"
+  with_items: "{{ node_instances }}"
+
+- name: "Add keycloak nodes to list of hosts"
+  add_host:
+    name: "{{ item.private_ip }}"
+    ansible_ssh_user: "{{ centos_user }}" 
+    ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ bastion_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
+    ansible_become: true
+    groups: 
+      - "{{ instance_name }}"
+      - "keycloak"
+      - "centos"
+      - "tunneled"
+  with_items: "{{ keycloak_instances }}"  

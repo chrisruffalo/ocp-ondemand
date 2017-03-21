@@ -1,0 +1,185 @@
+# needed to begin creating the layout for the rest of the items    
+- name: "Provision EC2 VPC network"
+  ec2_vpc_net:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: present
+    name: "{{ instance_name }}-vpc"
+    cidr_block: 10.0.0.0/16
+    tags:
+      purpose: "ocp"
+      instance: "{{ instance_name }}"
+    dns_support: true
+    dns_hostnames: true
+  register: vpc_result
+
+# create security groups
+- name: "Create SSH-allowed security group"
+  ec2_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    description: "allows SSH access"        
+    name: "{{ instance_name }}-ssh-allowed"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    rules:
+      - proto: tcp
+        to_port: 22
+        from_port: 22
+        cidr_ip: 0.0.0.0/0
+
+- name: "Create HTTP/HTTPS-allowed security group"
+  ec2_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    description: "allows HTTP and HTTPS access"        
+    name: "{{ instance_name }}-http-https-allowed"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    rules:
+      - proto: tcp
+        to_port: 80
+        from_port: 80
+        cidr_ip: 0.0.0.0/0
+      - proto: tcp
+        to_port: 443
+        from_port: 443
+        cidr_ip: 0.0.0.0/0
+
+- name: "Create 8443-allowed security group"
+  ec2_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    description: "allows HTTP and HTTPS access"        
+    name: "{{ instance_name }}-https-alt-allowed"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    rules:
+      - proto: tcp
+        to_port: 8443
+        from_port: 8443
+        cidr_ip: 0.0.0.0/0  
+
+- name: "Create internal allow-all security group"
+  ec2_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    description: "allows HTTP and HTTPS access"        
+    name: "{{ instance_name }}-all-internal-allowed"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    rules:
+      - proto: all
+        cidr_ip: 10.0.0.0/16
+
+- name: "Create internal postgres port"
+  ec2_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    description: "allows postgres port access"        
+    name: "{{ instance_name }}-postgres-allowed"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    rules:
+      - proto: tcp
+        to_port: 5432
+        from_port: 5432
+        cidr_ip: 10.0.0.0/16
+
+- name: "Create vpc subnets"
+  ec2_vpc_subnet:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    cidr: "{{ item.cidr }}"
+    az: "{{ item.az }}"
+    resource_tags:
+      Name: "{{ instance_name }}-{{ item.name }}"
+      instance: "{{ instance_name }}"
+  register: subnet_result
+  with_items:
+    - cidr: 10.0.1.0/24
+      az: "{{ aws_region}}a"
+      name: "public-1"
+    - cidr: 10.0.2.0/24
+      az: "{{ aws_region}}b"
+      name: "public-2"
+    - cidr: 10.0.3.0/24
+      az: "{{ aws_region}}a"
+      name: "private-1"
+    - cidr: 10.0.4.0/24
+      az: "{{ aws_region}}b"
+      name: "private-2"
+
+- name: "Merge subnet results"
+  set_fact:
+    subnets: "{{ subnets | default([]) + [ item ]}}"
+  with_items: "{{ subnet_result.results }}"
+
+# create igd for internet connectivity for public hosts
+- name: "Create IGW"
+  ec2_vpc_igw:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    state: present
+  register: igw
+
+# create private NAT endpoint on public IP
+- name: "Create NAT gatway with associating EIP into public subnet and using it as a routing target"
+  ec2_vpc_nat_gateway:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    state: present
+    subnet_id: "{{ subnets[1].subnet.id }}"
+    wait: yes
+    region: "{{ aws_region }}"
+    if_exist_do_not_create: true
+  register: nat_gateway
+
+# route from all public subnets to 0.0.0.0/0 through the IGW
+- name: "Create routing destination from public subnets to outside (via internet gateway)"
+  ec2_vpc_route_table:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    tags:
+      Name: "{{ instance_name }}-public"
+      instance: "{{ instance_name }}"
+    subnets:
+      - "{{ subnets[0].subnet.cidr_block }}"
+      - "{{ subnets[1].subnet.cidr_block }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ igw.gateway_id }}"
+  register: nat_route_table    
+
+# route all other traffic through the NAT gateway for private subnets
+- name: "Create routing destination from VPC subnets to outside"
+  ec2_vpc_route_table:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    tags:
+      Name: "{{ instance_name }}-private"
+      instance: "{{ instance_name }}"
+    subnets:
+      - "{{ subnets[2].subnet.cidr_block }}"
+      - "{{ subnets[3].subnet.cidr_block }}"
+    routes:
+      - dest: 0.0.0.0/0
+        gateway_id: "{{ nat_gateway.nat_gateway_id }}"
+  register: igw_route_table

@@ -1,0 +1,36 @@
+---
+# create ec2 key
+- name: "Check if EC2 keypair private key exists"
+  stat:
+    path: "static/{{ instance_name }}.id_rsa"
+  register: keypair_stat
+
+- name: "Create EC2 keypair for using with hosts / jump host"
+  ec2_key:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    name: "{{ instance_name }}"
+    state: present
+    region: "{{ aws_region }}"
+    wait: true
+  when: not keypair_stat.stat.exists
+  register: keypair
+
+# save key
+- name: "Persist private key to 'static' assets directory"
+  copy:
+    dest: "static/{{ instance_name }}.id_rsa"
+    content: "{{ keypair.key.private_key }}"
+    mode: 0400 # only readable by current user
+  when: keypair.changed
+
+- name: "Delete old public key if keypair changed"
+  file:
+    dest: "static/{{ instance_name }}.id_rsa.pub"
+    state: absent
+  when: keypair.changed
+
+- name: "Create public key from private key material"
+  shell: "ssh-keygen -y -f static/{{ instance_name }}.id_rsa > static/{{ instance_name }}.id_rsa.pub"
+  args:
+    creates: "static/{{ instance_name }}.id_rsa.pub"

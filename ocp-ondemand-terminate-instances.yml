@@ -31,30 +31,14 @@
         instance_ids: "{{ previous_instance_ec2_facts.instances | map(attribute = 'id') | list }}"
       when: previous_instance_ec2_facts.instances 
 
-    - name: "Terminate master load balancer"
-      ec2_elb_lb:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"
-        name: "{{ instance_name | regex_replace('[_]','-') }}-master-lb"
-        state: absent
-
-    - name: "Terminate router balancer"
-      ec2_elb_lb:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"
-        name: "{{ instance_name | regex_replace('[_]','-') }}-router-lb"
-        state: absent
-
-    # delete ds
-    - name: "Delete DS"
-      ds:
+    # delete rds
+    - name: "Delete RDS"
+      rds:
         access_key: "{{ aws_access_key }}"
         secret_key: "{{ aws_secret_key }}"
         region: "{{ aws_region }}"        
-        short_name: "{{ instance_name }}"
-        state: absent
+        command: delete
+        instance_name: "{{ safe_instance_name }}-keycloak-db"
 
     # get information about VPC
     - name: "Get information about existing VPCs"
@@ -100,6 +84,75 @@
       when: vpc_net_facts.vpcs
       register: vpc_subnet_facts
  
+    # terminate application load balancers
+    - name: "Delete ALB"
+      extras_elb_application_lb:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"    
+        name: "{{ safe_instance_name }}-alb-ocp"
+        state: absent
+      register: alb_remove
+
+    - name: "Delete keycloak ALB"
+      extras_elb_application_lb:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"    
+        name: "{{ safe_instance_name }}-alb-keycloak"
+        state: absent
+      register: keycloak_alb_remove
+
+    - name: "Pause and wait for ALB to stop and free targets"
+      pause:
+        seconds: 25
+      when: alb_remove.changed or keycloak_alb_remove
+
+    - name: "Delete target for 80"
+      extras_elb_target_group:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"    
+        name: "{{ safe_instance_name }}-http-group"
+        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+        state: absent
+
+    - name: "Delete target for 443"
+      extras_elb_target_group:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"    
+        name: "{{ safe_instance_name }}-https-group"
+        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+        state: absent
+
+    - name: "Delete target for 8443"
+      extras_elb_target_group:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"    
+        name: "{{ safe_instance_name }}-https-alt-group"
+        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+        state: absent
+
+    - name: "Delete target for keycloak 80"
+      extras_elb_target_group:
+        access_key: "{{ aws_access_key }}"
+        secret_key: "{{ aws_secret_key }}"
+        region: "{{ aws_region }}"    
+        name: "{{ safe_instance_name }}-keycloak-http-group"
+        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+        state: absent
+
+    #- name: "Delete target for keycloak 443"
+    #  extras_elb_target_group:
+    #    access_key: "{{ aws_access_key }}"
+    #    secret_key: "{{ aws_secret_key }}"
+    #    region: "{{ aws_region }}"    
+    #    name: "{{ safe_instance_name }}-keycloak-https-group"
+    #    vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+    #    state: absent
+
     - name: "Terminate instance VPC subnets"
       ec2_vpc_subnet:
         access_key: "{{ aws_access_key }}"

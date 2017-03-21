@@ -1,0 +1,15 @@
+[Unit]
+Description=Keycloak
+After=network.target
+
+[Service]
+Type=idle
+Environment=JBOSS_HOME=/opt/jboss JBOSS_LOG_DIR=/var/log/keycloak "JAVA_OPTS=-Xms{{ ansible_memtotal_mb * 0.4 }}m -Xmx{{ ansible_memtotal_mb * 0.8 }}m -XX:MaxPermSize={{ ansible_memtotal_mb * 0.375 }}m"
+User=keycloak
+Group=keycloak
+ExecStart=/opt/keycloak/bin/standalone.sh -b 0.0.0.0
+TimeoutStartSec=600
+TimeoutStopSec=600
+
+[Install]
+WantedBy=multi-user.target

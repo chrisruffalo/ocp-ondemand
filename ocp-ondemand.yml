@@ -20,11 +20,6 @@
 # configure rhel hosts
 - hosts: rhel
   roles:
-    - "rhn" # need to attach to rhn before attending to uncommon tasks
+    - "rhn" # need to attach to rhn before attending to common tasks
     - "common"
-    - "rhel"
-
-# cause bastion host to start ocp install
-#- hosts: bastion
-#  roles: 
-#    - "ocp"
+    - "rhel" # any rhel-specific host stuff

@@ -19,18 +19,11 @@
     host: "{{ item }}"
   with_items: "{{ groups['tunneled'] }}"
 
-# pip is needed to quickly get ansible
-- name: "Install pip"
+# packages required for application
+- name: "Install required packages"
   package:
-    name: pip
+    name: "git"
     state: present
-
-# need to start ocp install
-- name: "Install ansible"
-  pip:
-    name: 
-      - "ansible"
-      - "pyOpenSSL"
 
 # we need this BYO playbook to continue the run
 - name: "Checkout OCP playbook for later use"

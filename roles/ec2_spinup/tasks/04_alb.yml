@@ -1,0 +1,171 @@
+---
+# create the application load balancer
+- set_fact:
+    http_targets: "{{ http_targets | default([]) + [ {'Id': item, 'Port': 80 } ] }}"
+    https_targets: "{{ https_targets | default([]) + [ {'Id': item, 'Port': 443 } ] }}"
+  with_items: "{{ infra_instances | map(attribute = 'id') | list }}" 
+
+- set_fact:
+    https_alt_targets: "{{ https_alt_targets | default([]) + [ {'Id': item, 'Port': 443 } ] }}"
+  with_items: "{{ master_instances | map(attribute = 'id') | list }}" 
+
+- set_fact:
+    keycloak_http_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 80 } ] }}"
+    keycloak_https_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 443 } ] }}"
+  with_items: "{{ keycloak_instances | map(attribute = 'id') | list }}"
+
+- name: "Create target for 80"
+  extras_elb_target_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-http-group"
+    protocol: "http"
+    port: 80
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    targets: "{{ http_targets }}"
+    state: present
+
+- name: "Create target for 443"
+  extras_elb_target_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-https-group"
+    protocol: "https"
+    port: 443
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    targets: "{{ https_targets }}"
+    state: present
+
+- name: "Create target for 8443"
+  extras_elb_target_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-https-alt-group"
+    protocol: "https"
+    port: 8443
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    targets: "{{ https_alt_targets }}"
+    state: present
+
+- name: "Create an ALB load balancer for the cloud/master application"
+  extras_elb_application_lb:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-alb-ocp"
+    subnets:
+      - "{{ subnets[0].subnet.id }}" # public zone a
+      - "{{ subnets[3].subnet.id }}" # private zone b
+    security_groups:
+     - "{{ instance_name }}-https-alt-allowed"
+     - "{{ instance_name }}-http-https-allowed"
+    scheme: internal
+    listeners:
+      - Protocol: HTTPS
+        Port: 443
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ safe_instance_name }}-https-group"
+        Certificates:
+          - CertificateArn: "{{ certificate_arn }}"
+        SslPolicy: "ELBSecurityPolicy-TLS-1-2-2017-01" # very strict policy
+      - Protocol: HTTPS
+        Port: 8443
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ safe_instance_name }}-https-alt-group"
+        Certificates:
+          - CertificateArn: "{{ certificate_arn }}"
+        SslPolicy: "ELBSecurityPolicy-TLS-1-2-2017-01" # very strict policy
+      - Protocol: HTTP
+        Port: 80
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ safe_instance_name }}-http-group"
+    state: present
+  register: cloud_alb_result 
+
+- name: "Create target for keycloak-80"    
+  extras_elb_target_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-keycloak-http-group"
+    protocol: "http"
+    port: 8080
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    targets: "{{ keycloak_http_targets }}"
+    state: present
+
+#- name: "Create target for keycloak-443"    
+#  extras_elb_target_group:
+#    access_key: "{{ aws_access_key }}"
+#    secret_key: "{{ aws_secret_key }}"
+#    region: "{{ aws_region }}"    
+#    name: "{{ safe_instance_name }}-keycloak-https-group"
+#    protocol: "https"
+#    port: 8443
+#    vpc_id: "{{ vpc_result.vpc.id }}"
+#    targets: "{{ keycloak_https_targets }}"
+#    state: present
+
+- name: "Create an ALB load balancer for the login/keycloak application"
+  extras_elb_application_lb:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-alb-keyloak"
+    subnets:
+      - "{{ subnets[1].subnet.id }}" # public zone b
+      - "{{ subnets[2].subnet.id }}" # private zone a
+    security_groups:
+     - "{{ instance_name }}-https-alt-allowed"
+     - "{{ instance_name }}-http-https-allowed"
+    scheme: internal
+    listeners:
+      - Protocol: HTTPS
+        Port: 443
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ safe_instance_name }}-keycloak-http-group"
+        Certificates:
+          - CertificateArn: "{{ certificate_arn }}"
+        SslPolicy: "ELBSecurityPolicy-TLS-1-2-2017-01" # very strict policy
+      - Protocol: HTTP
+        Port: 80
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ safe_instance_name }}-keycloak-http-group"
+    state: present
+  register: keycloak_alb_result  
+
+# add a cname dns record to {{ hosted_zone }} and *.{{ hosted_zone }} that points to the alb
+- name: "Establish wildcard name for cloud hosted applications"
+  route53:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    command: "create"
+    zone: "{{ hosted_zone }}"
+    record: "*.{{ hosted_zone }}"
+    type: "CNAME"
+    value: "{{ cloud_alb_result.load_balancer.dns_name }}"
+    overwrite: true
+    ttl: 360
+  when: manage_host and alb_result and alb_result.load_balancer
+
+# and to "login.{{ hosted_zone }}"
+- name: "Establish name for login (keycloak) service"
+  route53:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    command: "create"
+    zone: "{{ hosted_zone }}"
+    record: "login.{{ hosted_zone }}"
+    type: "CNAME"
+    value: "{{ keycloak_alb_result.load_balancer.dns_name }}"
+    overwrite: true
+    ttl: 360
+  when: manage_host and keycloak_alb_result and keycloak_alb_result.load_balancer  

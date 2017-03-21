@@ -1,0 +1,22 @@
+---
+# create RDS for keycloak
+- name: "Create shared RDS for keycloak"
+  rds:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    command: create
+    instance_name: "{{ safe_instance_name }}-keycloak-db"
+    db_engine: postgres
+    size: 1
+    instance_type: "{{ keycloak_rds_size }}"
+    multi_zone: true
+    username: "keycloak"
+    password: "{{ keycloak_db_password }}"
+    subnet: "{{ subnets[2].subnet.id }}"
+    vpc_security_groups:
+      - "{{ instance_name }}-postgres-allowed"
+    tags:
+      instance: "{{ instance_name }}"
+      Name: "{{ instance_name }}-keycloak-db"
+  register: keycloak_db_result
