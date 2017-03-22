@@ -1,0 +1,77 @@
+---
+# terminate application load balancers
+- name: "Delete master/infra ALB"
+  extras_elb_application_lb:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-alb-ocp"
+    state: absent
+    wait: true
+  register: alb_remove
+
+- name: "Delete keycloak ALB"
+  extras_elb_application_lb:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-alb-keycloak"
+    state: absent
+    wait: true
+  register: keycloak_alb_remove
+
+- name: "Pause and wait for ALB to stop and free targets"
+  pause:
+    seconds: 20
+  when: alb_remove.changed or keycloak_alb_remove.changed
+
+- name: "Delete target for 80"
+  extras_elb_target_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-http-group"
+    vpc_id: "{{ vpc_id }}"
+    state: absent
+
+- name: "Delete target for 443"
+  extras_elb_target_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-https-group"
+    vpc_id: "{{ vpc_id }}"
+    state: absent
+
+- name: "Delete target for 8443"
+  extras_elb_target_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-https-alt-group"
+    vpc_id: "{{ vpc_id }}"
+    state: absent
+
+- name: "Delete target for keycloak 80"
+  extras_elb_target_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-keycloak-http-group"
+    vpc_id: "{{ vpc_id }}"
+    state: absent
+
+#- name: "Delete target for keycloak 443"
+#  extras_elb_target_group:
+#    access_key: "{{ aws_access_key }}"
+#    secret_key: "{{ aws_secret_key }}"
+#    region: "{{ aws_region }}"    
+#    name: "{{ safe_instance_name }}-keycloak-https-group"
+#    vpc_id: "{{ vpc_id }}"
+#    state: absent
+
+- name: "Pause and wait for target groups to spin down"
+  pause:
+    seconds: 5
+  when: alb_remove.changed or keycloak_alb_remove.changed
+

@@ -1,0 +1,3 @@
+---
+- redhat_subscription:
+    state: absent

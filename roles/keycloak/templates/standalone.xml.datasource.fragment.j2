@@ -1,0 +1,30 @@
+<datasources>
+    <datasource jndi-name="java:jboss/datasources/ExampleDS" pool-name="ExampleDS" enabled="true" use-java-context="true">
+        <connection-url>jdbc:h2:mem:test;DB_CLOSE_DELAY=-1</connection-url>
+        <driver>h2</driver>
+        <security>
+            <user-name>sa</user-name>
+            <password>sa</password>
+        </security>
+    </datasource>
+    <datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" enabled="true" use-java-context="true">
+        <connection-url>jdbc:postgresql://{{ ec2_info.keycloak_db.instance.endpoint }}/keycloak</connection-url>
+        <driver>postgresql</driver>
+        <pool>
+            <max-pool-size>20</max-pool-size>
+        </pool>
+        <security>
+            <user-name>keycloak</user-name>
+            <password>{{ keycloak_db_password }}</password>
+        </security>
+    </datasource>
+    <drivers>
+        <driver name="h2" module="com.h2database.h2">
+            <xa-datasource-class>org.h2.jdbcx.JdbcDataSource</xa-datasource-class>
+        </driver>
+        <drivers>
+        <driver name="postgresql" module="org.postgresql">
+            <xa-datasource-class>org.postgresql.xa.PGXADataSource</xa-datasource-class>
+        </driver>
+    </drivers>
+</datasources>

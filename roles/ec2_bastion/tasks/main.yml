@@ -8,9 +8,9 @@
 - name: "Copy id_rsa to use inside protected networks"
   copy:
     src: "static/{{ instance_name }}.id_rsa"
-    dest: "/home/{{ bastion_user }}/.ssh/id_rsa"
-    owner: "{{ bastion_user }}"
-    group: "{{ bastion_user }}"
+    dest: "/home/{{ centos_user }}/.ssh/id_rsa"
+    owner: "{{ centos_user }}"
+    group: "{{ centos_user }}"
     mode: 0400
 
 - name: "Wait for other (private network) hosts to come up so they can be managed"
@@ -29,13 +29,20 @@
 - name: "Checkout OCP playbook for later use"
   git:
     repo: "https://github.com/openshift/openshift-ansible.git"
-    dest: "/opt/"
-    version: "1.4"
+    dest: "/opt/openshift-ansible"
+    version: "release-1.5"
 
 # make sure facts are more accessible
 - name: "Move collected ec2 facts from localhost to a more convienient location"
   set_fact:
     ec2_info: "{{ hostvars['localhost']['ec2_info'] }}"
+
+- name: "Create ansible directory"
+  file:
+    state: directory
+    path: "/etc/ansible"
+    owner: "root"
+    group: "root"
 
 # write the host inventory as the default ansible inventory
 - name: "Write Host Inventory"

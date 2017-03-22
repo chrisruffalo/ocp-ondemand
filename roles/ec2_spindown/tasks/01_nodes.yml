@@ -1,0 +1,19 @@
+---
+# terminate instance if previous instance exists
+- name: "Gather previous instance details if any exist"
+  ec2_remote_facts:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    filters:
+      "tag:instance": "{{ instance_name }}"
+  register: previous_instance_ec2_facts
+
+- name: "Terminate instances that were previously launched"
+  ec2:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: absent
+    instance_ids: "{{ previous_instance_ec2_facts.instances | map(attribute = 'id') | list }}"
+  when: previous_instance_ec2_facts.instances 

@@ -15,8 +15,8 @@ rhel7_ami: "ami-b63769a1"
 centos7_ami: "ami-6d1c2007"
 
 # ami credentials
-bastion_user: "centos"
-ocp_user: "ec2-user"
+centos_user: "centos"
+rhel_user: "ec2-user"
 
 # rhn credentials
 rhn_username: "{{ vault_rhn_username }}"
@@ -27,7 +27,6 @@ rhn_pool: "{{ vault_rhn_pool }}"
 keycloak_admin_user: "kadmin"
 keycloak_admin_password: "{{ vault_keycloak_admin_password }}"
 keycloak_db_password: "{{ vault_keycloak_db_password }}"
-keycloak_download_url: "https://downloads.jboss.org/keycloak/3.0.0.CR1/keycloak-3.0.0.CR1.tar.gz" # MUST BE TARBALL
 
 # numbers of each available node-type
 master_count: 3 # need 3 to prevent split brain, or go with one

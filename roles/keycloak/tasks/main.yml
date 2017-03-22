@@ -11,17 +11,33 @@
     name: 
       - "java-1.8.0-openjdk"
       - "java-1.8.0-openjdk-devel"
+      - "epel-release"
+
+- name: "Install pip after epel makes it available"
+  package:
+    name: 
+      - "python2-pip"
+
+- name: "Upgrade pip to latest version"
+  command: "/bin/pip install --upgrade pip"
+  args:
+    creates: "/usr/lib/python2.7/site-packages/pip-9.0.1.dist-info"
+
+# install wildfly/python connector
+- name: "Install python library for talking to Wildfly"
+  pip:
+    name: "wildfly-py"
 
 # create jboss user
 - name: "Create JBoss user"
   user:
     name: "jboss"
-
-# create directory/structure for wildfly/jboss/keycloak
-- name: "Create directory structure for jboss"
-  file:
-    state: directory
-    path: "/opt/keycloak"
+    
+# download and unzip keycloak
+- name: "Get keycloak distribution"
+  get_url:
+    url: "{{ keycloak_download_url }}"
+    dest: "/opt/{{ keycloak_dist_name }}.tar.gz"
     owner: "jboss"
     group: "jboss"
 
@@ -32,23 +48,28 @@
     path: "/var/log/keycloak"
     owner: "jboss"
     group: "jboss"    
-    
-# download and unzip keycloak
-- name: "Get keycloak distribution"
-  get_url:
-    url: "{{ keycloak_download_url }}"
-    dest: "/opt/keycloak-dist.tar.gz"
-    owner: "jboss"
-    group: "jboss"
 
 - name: "Unarchive keycloak distribution"
   unarchive:
-    src: "/opt/keycloak-dist.tar.gz"
-    dest: "/opt/keycloak"
+    src: "/opt/{{ keycloak_dist_name }}.tar.gz"
+    dest: "/opt"
     remote_src: yes
     owner: "jboss"
     group: "jboss"
     creates: "/opt/keycloak/bin/standalone.sh"
+
+- name: "Symlink keycloak distribution to target directory"
+  file:
+    state: link
+    src: "/opt/{{ keycloak_dist_name }}"
+    dest: "/opt/keycloak"
+
+- name: "Ensure symlink source is controlled"
+  file:
+    state: directory
+    path: "/opt/{{ keycloak_dist_name }}"
+    owner: "jboss"
+    group: "jboss"
 
 # install postgres module
 - name: "Create module location for postgres module"
@@ -72,62 +93,49 @@
     owner: "jboss"
     group: "jboss"
 
-# manipulate configuration files for database (add driver, add data source)
-- name: "Insert section that adds driver to standalone XML file"
-  blockinfile:
-    path: "/opt/keycloak/standalone/configuration/{{ configuration_xml }}"
-    insertbefore: "<\/drivers>"
-    content: |
-      <driver name="postgresql" module="org.postgresql">
-        <xa-datasource-class>org.postgresql.xa.PGXADataSource</xa-datasource-class>
-      </driver>
-
-- name: "Insert section that creates datasource"
-  blockinfile:
-    path: "/opt/keycloak/standalone/configuration/{{ configuration_xml }}"
-    insertbefore: "<datasource.+?datasources\/KeycloakDS(.|\n)+?<\/datasource>"
-    content: |
-      <datasource jndi-name="java:jboss/datasources/KeycloakDS" pool-name="KeycloakDS" enabled="true" use-java-context="true">
-          <connection-url></connection-url>
-          <driver>jdbc:postgresql://{{ ec2_info.keycloak_db.private_ip }}/keycloak</driver>
-          <pool>
-            <max-pool-size>20</max-pool-size>
-          </pool>
-          <security>
-              <user-name>keycloak</user-name>
-              <password>{{ keycloak_db_password }}</password>
-          </security>
-      </datasource>
-
-# add a keycloak user
-- name: "Add keycloak user"
-  command: "/opt/keycloak/bin/add-user-keycloak.sh -r master -u {{ keycloak_admin_user }} -p {{ keycloak_admin_password }}"
-
-# use kcadm to establish authentication realm for hosted domain/zone
-# see: https://www.keycloak.org/docs/3.0/server_admin/topics/admin-cli.html
-- name: "Authenticate keycloak admin-cli"
-  command: "/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/auth --realm master --user {{ keycloak_admin_user }} --password {{ keycloak_admin_password }}"
-
-- name: "Create realm for instance"
-  command: "/opt/keycloak/bin/kcadm.sh create realms -s realm='{{ safe_instance_name }}' -s enabled=true"
-
-# todo: manipulate configuration files for direct ip clustering
-
-
 # create systemctl service and copy file
 - name: "Copy systemctl service unit file"
   template:
     src: "keycloak.service.j2"
     dest: "/etc/systemd/system/keycloak.service"
-  notify:
-    - "reload systemd"
-    - "restart keycloak"
 
 # enable service
 - name: "Enable keycloak service"
   service:
     name: "keycloak"
     enabled: true
+    daemon_reload: true
+
+# add user for jboss admin (local / console)
+- name: "Add user for jboss console / local"
+  command: "/opt/keycloak/bin/add-user.sh -e -s -r ManagementRealm -u {{ keycloak_admin_user}} -p \"{{ keycloak_admin_password }}\""
+
+# start service and wait for it to be started so that changes can be made against the API
+- name: "Start Keycloak JBoss Instance because, if you don't, the commands won't work"
+  service:
+    name: "keycloak"
+    state: started
+
+- name: "Wait for service to be up"
+  wait_for:
+    port: 8080
+
+# add a keycloak user
+- name: "Add keycloak user"
+  run_once: true
+  command: "/opt/keycloak/bin/add-user-keycloak.sh -r master -u {{ keycloak_admin_user }} -p \"{{ keycloak_admin_password }}\""
+
+# use kcadm to establish authentication realm for hosted domain/zone
+# see: https://www.keycloak.org/docs/3.0/server_admin/topics/admin-cli.html
+- name: "Authenticate keycloak admin-cli"
+  run_once: true
+  command: "/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/auth --realm master --user {{ keycloak_admin_user }} --password {{ keycloak_admin_password }}"
+
+- name: "Create realm for instance"
+  run_once: true
+  command: "/opt/keycloak/bin/kcadm.sh create realms -s realm='{{ safe_instance_name }}' -s enabled=true"
+
+# todo: manipulate configuration files for direct ip clustering
 
 # open firewall ports
 - name: "Open firewall ports for Keycloak"
@@ -137,5 +145,4 @@
     immediate: true
     permanent: true
   with_items:
-    - 8080
-    - 8443
+    - 8080 # only http, https termination handled by ALB

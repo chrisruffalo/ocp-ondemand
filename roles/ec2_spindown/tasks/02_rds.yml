@@ -1,0 +1,24 @@
+---
+# delete rds
+- name: "Delete RDS"
+  rds:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"        
+    command: delete
+    instance_name: "{{ safe_instance_name }}-keycloak-db"
+    wait: true
+  retries: 5 # sometimes it can take a while to delete
+  register: rds_delete_result
+
+- name: "Wait for some time when the rds was deleted before deleting the subnet group"
+  pause:
+    seconds: 15
+  when: rds_delete_result.changed
+
+- rds_subnet_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    state: absent
+    name: "{{ safe_instance_name }}-db-subnet-group"

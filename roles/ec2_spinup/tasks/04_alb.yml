@@ -57,11 +57,12 @@
     region: "{{ aws_region }}"    
     name: "{{ safe_instance_name }}-alb-ocp"
     subnets:
-      - "{{ subnets[0].subnet.id }}" # public zone a
-      - "{{ subnets[3].subnet.id }}" # private zone b
+      - "{{ subnets[0].subnet.id }}" # zone a
+      - "{{ subnets[1].subnet.id }}" # zone b
+      - "{{ subnets[2].subnet.id }}" # zone c
     security_groups:
-     - "{{ instance_name }}-https-alt-allowed"
-     - "{{ instance_name }}-http-https-allowed"
+      - "{{ instance_name }}-https-alt-allowed"
+      - "{{ instance_name }}-http-https-allowed"
     scheme: internal
     listeners:
       - Protocol: HTTPS
@@ -100,30 +101,19 @@
     targets: "{{ keycloak_http_targets }}"
     state: present
 
-#- name: "Create target for keycloak-443"    
-#  extras_elb_target_group:
-#    access_key: "{{ aws_access_key }}"
-#    secret_key: "{{ aws_secret_key }}"
-#    region: "{{ aws_region }}"    
-#    name: "{{ safe_instance_name }}-keycloak-https-group"
-#    protocol: "https"
-#    port: 8443
-#    vpc_id: "{{ vpc_result.vpc.id }}"
-#    targets: "{{ keycloak_https_targets }}"
-#    state: present
-
 - name: "Create an ALB load balancer for the login/keycloak application"
   extras_elb_application_lb:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
     region: "{{ aws_region }}"    
-    name: "{{ safe_instance_name }}-alb-keyloak"
+    name: "{{ safe_instance_name }}-alb-keycloak"
     subnets:
-      - "{{ subnets[1].subnet.id }}" # public zone b
-      - "{{ subnets[2].subnet.id }}" # private zone a
+      - "{{ subnets[0].subnet.id }}" # zone a
+      - "{{ subnets[1].subnet.id }}" # zone b
+      - "{{ subnets[2].subnet.id }}" # zone c
     security_groups:
-     - "{{ instance_name }}-https-alt-allowed"
-     - "{{ instance_name }}-http-https-allowed"
+      - "{{ instance_name }}-https-alt-allowed"
+      - "{{ instance_name }}-http-https-allowed"
     scheme: internal
     listeners:
       - Protocol: HTTPS
@@ -134,16 +124,11 @@
         Certificates:
           - CertificateArn: "{{ certificate_arn }}"
         SslPolicy: "ELBSecurityPolicy-TLS-1-2-2017-01" # very strict policy
-      - Protocol: HTTP
-        Port: 80
-        DefaultActions:
-          - Type: forward
-            TargetGroupName: "{{ safe_instance_name }}-keycloak-http-group"
     state: present
   register: keycloak_alb_result  
 
 # add a cname dns record to {{ hosted_zone }} and *.{{ hosted_zone }} that points to the alb
-- name: "Establish wildcard name for cloud hosted applications"
+- name: "Establish dns wildcard name for cloud hosted applications (based on just-created ALB)"
   route53:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
@@ -154,10 +139,10 @@
     value: "{{ cloud_alb_result.load_balancer.dns_name }}"
     overwrite: true
     ttl: 360
-  when: manage_host and alb_result and alb_result.load_balancer
+  when: manage_host and cloud_alb_result and cloud_alb_result.load_balancer
 
 # and to "login.{{ hosted_zone }}"
-- name: "Establish name for login (keycloak) service"
+- name: "Establish dns name for login (keycloak) service (based on just-created ALB)"
   route53:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"

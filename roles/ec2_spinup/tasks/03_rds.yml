@@ -1,4 +1,16 @@
 ---
+- rds_subnet_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    state: present
+    name: "{{ safe_instance_name }}-db-subnet-group"
+    description: My Fancy Ex Parrot Subnet Group
+    subnets:
+      - "{{ subnets[0].subnet.id }}"
+      - "{{ subnets[1].subnet.id }}"
+      - "{{ subnets[2].subnet.id }}"
+
 # create RDS for keycloak
 - name: "Create shared RDS for keycloak"
   rds:
@@ -8,15 +20,18 @@
     command: create
     instance_name: "{{ safe_instance_name }}-keycloak-db"
     db_engine: postgres
-    size: 1
+    port: 5432
+    size: 5
     instance_type: "{{ keycloak_rds_size }}"
-    multi_zone: true
     username: "keycloak"
     password: "{{ keycloak_db_password }}"
-    subnet: "{{ subnets[2].subnet.id }}"
+    subnet: "{{ safe_instance_name }}-db-subnet-group"
     vpc_security_groups:
-      - "{{ instance_name }}-postgres-allowed"
+      - "{{ postgres_security_group_result.group_id }}"
     tags:
       instance: "{{ instance_name }}"
       Name: "{{ instance_name }}-keycloak-db"
+    maint_window: "Mon:23:00-Tue:03:15"
+    wait: true
+  retries: 3 # rds databases can take a long time to spin up
   register: keycloak_db_result

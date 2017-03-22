@@ -1,0 +1,24 @@
+---
+# get information about VPC
+- name: "Get information about existing VPCs"
+  ec2_vpc_net_facts:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    filters:
+      "tag:Name": "{{ instance_name }}-vpc"
+  register: vpc_net_facts
+
+- set_fact:
+    vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+
+# get information about subnets
+- name: "Get subnet information"
+  ec2_vpc_subnet_facts:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    filters:
+      vpc-id: "{{ vpc_id }}"
+  when: vpc_net_facts.vpcs
+  register: vpc_subnet_facts

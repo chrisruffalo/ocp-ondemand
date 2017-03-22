@@ -1,0 +1,108 @@
+---
+# remove internet gateway
+- name: "Remove IGW"
+  ec2_vpc_igw:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    vpc_id: "{{ vpc_id }}"
+    state: absent
+
+# get information about nats
+- name: "Get NAT gateway information"
+  extras_ec2_vpc_nat_gateway_facts:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    filters:
+      vpc-id: "{{ vpc_id }}"
+  when: vpc_net_facts.vpcs          
+  register: vpc_nat_facts
+
+# delete options
+- name: "Delete NAT gateways"
+  ec2_vpc_nat_gateway:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    release_eip: yes
+    nat_gateway_id: "{{ vpc_nat_facts.id }}"
+  when: vpc_net_facts.vpcs and vpc_nat_facts and vpc_nat_facts.id is defined
+
+# todo: release ips (??)
+
+- name: "Terminate instance VPC subnets"
+  ec2_vpc_subnet:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: absent
+    vpc_id: "{{ vpc_id }}"
+    cidr: "{{ item.cidr_block }}"
+  when: vpc_net_facts.vpcs
+  with_items: "{{ vpc_subnet_facts.subnets }}"
+  register: subnet_delete_results
+
+- name: "Pause and wait for subnets to be fully removed"
+  pause:
+    seconds: 5
+  when: subnet_delete_results.changed
+
+# get information to delete route tables (and other incidental artifacts)
+- name: "Get details about existing routing tables"
+  ec2_vpc_route_table_facts:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"        
+    filters:
+      vpc-id: "{{ vpc_id }}"
+  when: vpc_net_facts.vpcs    
+  register: route_table_facts    
+
+- name: "Delete routing tables"
+  ec2_vpc_route_table:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: absent
+    lookup: id
+    route_table_id: "{{ item.id }}"
+    vpc_id: "{{ vpc_id }}"
+  with_items: "{{ route_table_facts.route_tables }}"
+  when: route_table_facts.route_tables
+  register: routing_table_delete_results
+
+- name: "Pause and wait for routing tables to drop"
+  pause:
+    seconds: 5
+  when: routing_table_delete_results.changed
+
+# remove security groups associated with vpc
+- extras_ec2_group_facts:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    filters:
+      vpc-id: "{{ vpc_id }}"
+  register: vpc_sec_groups
+
+- ec2_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    name: "{{ item.group_name }}"
+    state: absent
+    description: "{{ item.description }}"
+  when: item.group_name != "default" # can't delete default group
+  with_items: "{{ vpc_sec_groups.security_groups }}"
+
+# everything is gone, terminate VPC
+- name: "Terminate instance VPC"
+  ec2_vpc_net:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    state: absent
+    name: "{{ instance_name }}-vpc"
+    cidr_block: 10.0.0.0/16
+    region: "{{ aws_region }}"
+  when: vpc_net_facts.vpcs        

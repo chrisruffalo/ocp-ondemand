@@ -1,198 +1,53 @@
 ---
-# terminate instances
+# collect some information
 - hosts: localhost
   connection: local
   gather_facts: false
   tasks:
-    # make sure boto and boto3 are installed for aws/ec2 tools
-    - name: "Install AWS client dependencies"
-      pip:
-        name: 
-          - "boto"
-          - "boto3"
-          - "pyOpenSSL"
-    
-    # terminate instance if previous instance exists
-    - name: "Gather previous instance details if any exist"
+    - name: "Gather previous bastion instance details if any exist"
       ec2_remote_facts:
         access_key: "{{ aws_access_key }}"
         secret_key: "{{ aws_secret_key }}"
         region: "{{ aws_region }}"
         filters:
           "tag:instance": "{{ instance_name }}"
-      register: previous_instance_ec2_facts
-    
-    - name: "Terminate instances that were previously launched"
-      ec2:
+          "tag:Name": "{{ instance_name }}-bastion"
+          instance-state-name: running  
+      register: bastion_instances
+
+    - name: "Gather previous rhel instance details if any exist"
+      ec2_remote_facts:
         access_key: "{{ aws_access_key }}"
         secret_key: "{{ aws_secret_key }}"
         region: "{{ aws_region }}"
-        state: absent
-        instance_ids: "{{ previous_instance_ec2_facts.instances | map(attribute = 'id') | list }}"
-      when: previous_instance_ec2_facts.instances 
-
-    # delete rds
-    - name: "Delete RDS"
-      rds:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"        
-        command: delete
-        instance_name: "{{ safe_instance_name }}-keycloak-db"
-
-    # get information about VPC
-    - name: "Get information about existing VPCs"
-      ec2_vpc_net_facts:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"
-        filters:
-          "tag:Name": "{{ instance_name }}-vpc"
-      register: vpc_net_facts
-
-    # get information about nats
-    #- name: "Get NAT gateway information"
-    #  ec2_vpc_nat_gateway_facts:
-    #    access_key: "{{ aws_access_key }}"
-    #    secret_key: "{{ aws_secret_key }}"
-    #    region: "{{ aws_region }}"
-    #    filters:
-    #      vpc-id: "{{ vpc_net_facts.vpcs[0].id }}"
-    #  when: vpc_net_facts.vpcs          
-    #  register: vpc_nat_facts
-
-    # delete options
-    #- name: "Delete NAT gateways"
-    #  ec2_vpc_nat_gateway:
-    #    access_key: "{{ aws_access_key }}"
-    #    secret_key: "{{ aws_secret_key }}"
-    #    region: "{{ aws_region }}"
-    #    release_eip: yes
-    #    nat_gateway_id: "{{ vpc_nat_facts.id }}"
-    #  when: vpc_net_facts.vpcs
-
-    # release ips (??)
-
-    # get information about subnets
-    - name: "Get subnet information"
-      ec2_vpc_subnet_facts:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"
-        filters:
-          vpc-id: "{{ vpc_net_facts.vpcs[0].id }}"
-      when: vpc_net_facts.vpcs
-      register: vpc_subnet_facts
- 
-    # terminate application load balancers
-    - name: "Delete ALB"
-      extras_elb_application_lb:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"    
-        name: "{{ safe_instance_name }}-alb-ocp"
-        state: absent
-      register: alb_remove
-
-    - name: "Delete keycloak ALB"
-      extras_elb_application_lb:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"    
-        name: "{{ safe_instance_name }}-alb-keycloak"
-        state: absent
-      register: keycloak_alb_remove
-
-    - name: "Pause and wait for ALB to stop and free targets"
-      pause:
-        seconds: 25
-      when: alb_remove.changed or keycloak_alb_remove
-
-    - name: "Delete target for 80"
-      extras_elb_target_group:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"    
-        name: "{{ safe_instance_name }}-http-group"
-        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
-        state: absent
-
-    - name: "Delete target for 443"
-      extras_elb_target_group:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"    
-        name: "{{ safe_instance_name }}-https-group"
-        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
-        state: absent
-
-    - name: "Delete target for 8443"
-      extras_elb_target_group:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"    
-        name: "{{ safe_instance_name }}-https-alt-group"
-        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
-        state: absent
-
-    - name: "Delete target for keycloak 80"
-      extras_elb_target_group:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"    
-        name: "{{ safe_instance_name }}-keycloak-http-group"
-        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
-        state: absent
-
-    #- name: "Delete target for keycloak 443"
-    #  extras_elb_target_group:
-    #    access_key: "{{ aws_access_key }}"
-    #    secret_key: "{{ aws_secret_key }}"
-    #    region: "{{ aws_region }}"    
-    #    name: "{{ safe_instance_name }}-keycloak-https-group"
-    #    vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
-    #    state: absent
-
-    - name: "Terminate instance VPC subnets"
-      ec2_vpc_subnet:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"
-        state: absent
-        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
-        cidr: "{{ item.cidr_block }}"
-      when: vpc_net_facts.vpcs
-      with_items: "{{ vpc_subnet_facts.subnets }}"
-
-    # get information to delete route tables (and other incidental artifacts)
-    - name: "Get details about existing routing tables"
-      ec2_vpc_route_table_facts:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"        
         filters:
           "tag:instance": "{{ instance_name }}"
-      when: vpc_net_facts.vpcs    
-      register: route_table_facts    
+          "tag:os": "rhel7"
+          instance-state-name: running
+      register: rhel_instances
 
-    - name: "Delete routing tables"
-      ec2_vpc_route_table:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        region: "{{ aws_region }}"
-        state: absent
-        lookup: id
-        route_table_id: "{{ item.id }}"
-        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
-      with_items: "{{ route_table_facts.route_tables }}"
-      when: route_table_facts.route_tables
+    - name: "Add hosting nodes to list of hosts"
+      add_host:
+        name: "{{ item.private_ip_address }}"
+        ansible_ssh_user: "{{ rhel_user }}" 
+        ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_instances.instances[0].public_ip_address }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
+        ansible_become: true
+        groups: 
+          - "{{ instance_name }}"
+          - "rhel"
+          - "tunneled"
+      with_items: "{{ rhel_instances.instances }}"
+      when: bastion_instances.instances[0] and rhel_instances.instances and item.private_ip_address
 
-    # everything is gone, terminate VPC
-    - name: "Terminate instance VPC"
-      ec2_vpc_net:
-        access_key: "{{ aws_access_key }}"
-        secret_key: "{{ aws_secret_key }}"
-        state: absent
-        vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
-        region: "{{ aws_region }}"
-      when: vpc_net_facts.vpcs        
+# unsubscribe from rhel subscriptions
+- hosts: rhel
+  roles:
+    - "rhn_unsubscribe"
+
+# terminate instances
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  roles:
+    - "ec2_spindown"
+

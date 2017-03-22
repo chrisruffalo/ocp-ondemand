@@ -1,0 +1,23 @@
+---
+# make sure boto and boto3 are installed for aws/ec2 tools
+- name: "Install AWS client dependencies"
+  pip:
+    name: 
+      - "boto"
+      - "boto3"
+      - "pyOpenSSL"
+
+# pre-teardown stuff
+- include: "00_setup.yml"
+
+# remove nodes
+- include: "01_nodes.yml"
+
+# remove rds
+- include: "02_rds.yml"
+
+# remove application load balancers
+- include: "03_alb.yml"
+
+# remove networking
+- include: "04_vpc.yml"

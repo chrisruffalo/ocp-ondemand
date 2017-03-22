@@ -91,6 +91,7 @@
         to_port: 5432
         from_port: 5432
         cidr_ip: 10.0.0.0/16
+  register: postgres_security_group_result
 
 - name: "Create vpc subnets"
   ec2_vpc_subnet:
@@ -108,16 +109,16 @@
   with_items:
     - cidr: 10.0.1.0/24
       az: "{{ aws_region}}a"
-      name: "public-1"
+      name: "private-1"
     - cidr: 10.0.2.0/24
       az: "{{ aws_region}}b"
-      name: "public-2"
-    - cidr: 10.0.3.0/24
-      az: "{{ aws_region}}a"
-      name: "private-1"
-    - cidr: 10.0.4.0/24
-      az: "{{ aws_region}}b"
       name: "private-2"
+    - cidr: 10.0.3.0/24
+      az: "{{ aws_region}}c"
+      name: "private-3"
+    - cidr: 10.0.10.0/24
+      az: "{{ aws_region}}a"
+      name: "public-1"      
 
 - name: "Merge subnet results"
   set_fact:
@@ -132,19 +133,7 @@
     region: "{{ aws_region }}"    
     vpc_id: "{{ vpc_result.vpc.id }}"
     state: present
-  register: igw
-
-# create private NAT endpoint on public IP
-- name: "Create NAT gatway with associating EIP into public subnet and using it as a routing target"
-  ec2_vpc_nat_gateway:
-    access_key: "{{ aws_access_key }}"
-    secret_key: "{{ aws_secret_key }}"
-    state: present
-    subnet_id: "{{ subnets[1].subnet.id }}"
-    wait: yes
-    region: "{{ aws_region }}"
-    if_exist_do_not_create: true
-  register: nat_gateway
+  register: igw_result
 
 # route from all public subnets to 0.0.0.0/0 through the IGW
 - name: "Create routing destination from public subnets to outside (via internet gateway)"
@@ -158,12 +147,23 @@
       Name: "{{ instance_name }}-public"
       instance: "{{ instance_name }}"
     subnets:
-      - "{{ subnets[0].subnet.cidr_block }}"
-      - "{{ subnets[1].subnet.cidr_block }}"
+      - "{{ subnets[3].subnet.id }}"
     routes:
       - dest: 0.0.0.0/0
-        gateway_id: "{{ igw.gateway_id }}"
-  register: nat_route_table    
+        gateway_id: "{{ igw_result.gateway_id }}"
+
+# create private NAT endpoint on public IP
+- name: "Create NAT gatway with associated EIP into public subnet and using it as a routing target (sometimes this task times out the first time)"
+  ec2_vpc_nat_gateway:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    state: present
+    subnet_id: "{{ subnets[3].subnet.id }}"
+    wait: yes
+    region: "{{ aws_region }}"
+    if_exist_do_not_create: true
+  retries: 3
+  register: nat_gateway
 
 # route all other traffic through the NAT gateway for private subnets
 - name: "Create routing destination from VPC subnets to outside"
@@ -177,9 +177,9 @@
       Name: "{{ instance_name }}-private"
       instance: "{{ instance_name }}"
     subnets:
-      - "{{ subnets[2].subnet.cidr_block }}"
-      - "{{ subnets[3].subnet.cidr_block }}"
+      - "{{ subnets[0].subnet.id }}"
+      - "{{ subnets[1].subnet.id }}"
+      - "{{ subnets[2].subnet.id }}"
     routes:
       - dest: 0.0.0.0/0
         gateway_id: "{{ nat_gateway.nat_gateway_id }}"
-  register: igw_route_table
