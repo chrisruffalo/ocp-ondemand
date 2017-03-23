@@ -1,0 +1,18 @@
+---
+# from amazon after you create your user/group
+vault_aws_secret_key: "SECRET KEY"
+vault_aws_access_key: "ACCESS KEY"
+
+# from whatever package manager you use
+vault_rhn_username: "...@redhat.com"
+vault_rhn_password: "some really great pass phrase"
+
+# secure passwords that will be used for keycloak instance in ec2 
+vault_keycloak_admin_password: "kEyClOaKaDmIn!"
+vault_keycloak_db_password: "kEyClOaKaDmIn!"
+
+# the location of the wildcard certificate you generated for the cloud domain
+vault_certificate_arn: "arn:aws:acm:us-...ARN"
+
+# the cloud domain you are hosting from (and that you own)
+vault_hosted_zone: "cloud.rain.org"

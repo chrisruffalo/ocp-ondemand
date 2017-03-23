@@ -1,22 +1,15 @@
 #!/usr/bin/python
 
 from ansible.module_utils.basic import *
-import requests
-from requests.auth import HTTPDigestAuth
+from ansible.module_utils.wildfly import *
 
 def main():
-
-    # get base ec2 argument spec
-    argument_spec = {}
+    # get base argument spec for wildfly-api support
+    argument_spec = wildfly_spec()
 
     argument_spec.update(dict(
         # state
         state = dict(default='present', choices=['present', 'absent']),
-        # wildfly-connecty-bits  
-        wildfly_host = dict(default='localhost'),
-        wildfly_port = dict(default=9990),
-        wildfly_username = dict(),
-        wildfly_password = dict(no_log=False),
         # datasource specific bits
         datasource_name = dict(required=True),
         datasource_properties = dict(default={}, type='dict')
@@ -44,64 +37,8 @@ def main():
         # return
         module.exit_json(changed=has_changed, success=success, datasource=metadata)
 
-
-def make_wildfly_request(operation, address, parameters, module):
-    # data
-    data = module.params
-
-    # validate data
-    if data['wildfly_username']:
-        if not data['wildfly_password']:
-            module.fail_json(changed=False, success=False, msg="If the value `wildfly_username` is provided a `wildfly_password` must also be provided")
-
-        auth = HTTPDigestAuth(data['wildfly_username'], data['wildfly_password'])
-    else:
-        auth = None
-
-    # the url to request
-    url = "http://" + data['wildfly_host'] + ":" + data['wildfly_port'] + "/management"
-
-    # create payload from inputs
-    payload = {}
-    if parameters:
-        payload = parameters.copy()
-    payload['operation'] = operation
-    payload['address'] = address
-
-    # create headers
-    headers = {"Content-Type": "application/json"}
-
-    # make request
-    try: 
-        if auth:
-            # make authenticated request
-            r = requests.post(url, headers=headers, json=payload, auth=auth)
-        else:
-            # make unauthenticated request
-            r = requests.post(url, headers=headers, json=payload)
-        
-        # if there is no readable json content then we need to 
-        # raise up the status, if there is content we can continue
-        try:
-            r.json()
-        except ValueError as e:
-            r.raise_for_status()
-
-        # direct response return                
-        return r        
-    except requests.exceptions.HTTPError as e:
-        module.fail_json(changed=False, success=False, msg="There was an error contacting the wildfly server (" + url + "), " + str(e) + ": " + r.text)
-
-def check_json_fail(json, module, changed=False):
-    if json['outcome'] != 'success' or 'failure-description' in json:
-        msg = "An unspecified error has occurred"
-        if json['failure-description']:
-            msg = json['failure-description']
-        module.fail_json(changed=changed, success=False, msg=msg)
-
 def get_datasource_by_name(datasource_name, module):
-    response = make_wildfly_request(operation="read-resource", address=[{"subsystem": "datasources"}, {"data-source": datasource_name}], parameters=None, module=module)
-    json = response.json()
+    json = make_wildfly_request(operation="read-resource", address=[{"subsystem": "datasources"}, {"data-source": datasource_name}], parameters=None, module=module)
 
     # datasource not found
     if json['outcome'] != 'success' or 'failure-description' in json or not 'result' in json:
@@ -128,8 +65,7 @@ def datasource_create(module):
 
     # we need to add the datasource directly
     if not datasource:
-        response = make_wildfly_request(operation="add", address=[{"subsystem": "datasources"}, {"data-source": datasource_name}], parameters=data['datasource_properties'], module=module)
-        json = response.json()
+        json = make_wildfly_request(operation="add", address=[{"subsystem": "datasources"}, {"data-source": datasource_name}], parameters=data['datasource_properties'], module=module)
 
         # handle failure response
         check_json_fail(json, module)
@@ -144,8 +80,8 @@ def datasource_create(module):
             if not (key in datasource and datasource_properties[key] == datasource[key]):
                 # make request and check response
                 params = { "name": key, "value": value }
-                response = make_wildfly_request(operation="write-attribute", address=[{"subsystem": "datasources"}, {"data-source": datasource_name}], parameters=params, module=module)
-                json = response.json()
+                json = make_wildfly_request(operation="write-attribute", address=[{"subsystem": "datasources"}, {"data-source": datasource_name}], parameters=params, module=module)
+
                 check_json_fail(json, module, updated)
 
                 # after one update we need to return 'changed'
@@ -168,8 +104,7 @@ def datasource_remove(module):
         return False, True, {}, None
 
     # we need to delete the datasource
-    response = make_wildfly_request(operation="remove", address=[{"subsystem": "datasources"}, {"data-source": datasource_name}], parameters=None, module=module)
-    json = response.json()
+    json = make_wildfly_request(operation="remove", address=[{"subsystem": "datasources"}, {"data-source": datasource_name}], parameters=None, module=module)
 
     # failure response
     check_json_fail(json, module)
