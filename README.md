@@ -1,4 +1,4 @@
-# On Demand / One-Touch CICD environment with OCP in EC2
+# On Demand / One-Touch OCP environment in EC2
 
 ## Prerequisites
 * Ansible
