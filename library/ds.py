@@ -2,21 +2,14 @@
 # using https://github.com/ansible/ansible/blob/devel/lib/ansible/modules/cloud/amazon/ec2.py as a template
 # and https://github.com/ansible/ansible/blob/devel/lib/ansible/modules/cloud/amazon/ec2_vpc_nat_gateway.py too!
 
+import requests
 from ansible.module_utils.basic import *
-
-# ensure boto is present
-try:
-    import botocore
-    import boto3
-    HAS_BOTO3 = True
-except ImportError:
-    HAS_BOTO3 = False
 
 def main():
 
-    # get base ec2 argument spec
-    argument_spec = ec2_argument_spec()
-
+    # base argument spec
+    argument_spec = dict()
+    # add arguments
     argument_spec.update(dict(
         state = dict(default='present', choices=['present', 'absent']),
         name = dict(),
