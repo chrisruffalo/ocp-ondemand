@@ -42,3 +42,9 @@
 
 #- debug:
 #    msg: "{{ ec2_info.ds }}"
+
+# set up dynamic variables/inventory
+- name: "Copy generated/dynamic host template"
+  template:
+    dest: "./hosts/dynamic"
+    src: "dynamic_hosts.j2"

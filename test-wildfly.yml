@@ -1,25 +1,42 @@
 ---
-# playbook to create OCP on demand in a VPC in EC2 with 
-# a configurable number of nodes, a HA gitlab instance,
-# and an HA multi-tenant Eclipse CHE instance
-# see more here: https://docs.openshift.com/container-platform/3.4/install_config/install/advanced_install.html#running-the-advanced-installation
-
-# create ec2 infrastructure (from localhost, making only needed changes to get the ec2 client running)
+# test wildfly
 - hosts: localhost
   connection: local
   gather_facts: false
   tasks:
-    - name: "Wildfly DataSource"
-      wildfly_datasource:
-        wildfly_username: "keycloak"
-        wildfly_password: "keycloak"
-        state: present
-        datasource_name: "KeycloakDS2"
-        datasource_properties:
-          connection-url: "jdbc:h2:mem:keycloak;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
-          driver-name: "h2"          
-          enabled: true
+    - name: "Postgres Driver"
+      wildfly_api: 
+        username: "keycloak"
+        password: "keycloak"
+        operation: present
+        address:
+          - {"subsystem": "datasources"}
+          - {"jdbc-driver": "postgresql"}
+        parameters:
+          driver-name: "postgresql"
+          driver-module-name: "org.postgresql"          
+          driver-xa-datasource-class-name: "org.postgresql.xa.PGXADataSource"
+
+    - name: "Postgres-based datasource"
+      wildfly_api:
+        username: "keycloak"
+        password: "keycloak"
+        operation: present
+        address:
+          - {"subsystem": "datasources"}
+          - {"data-source": "KeycloakDS"}
+        parameters:
+          driver-name: "h2"
+          jndi-name: "java:jboss/datasources/KeycloakDS"
           user-name: "sa"
           password: "sa"
+          connection-url: "jdbc:h2:${jboss.server.data.dir}/keycloak-test-url-change;AUTO_SERVER=TRUE"
+          enabled: true
+          use-java-context: true
+
+
+
+
+
     
 

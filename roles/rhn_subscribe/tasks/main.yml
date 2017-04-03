@@ -1,4 +1,9 @@
 ---
-- redhat_subscription:
+- name: "Subscribe to Red Hat repositories in pool that has access to OSE/OCP artifacts"
+  redhat_subscription:
     username: "{{ rhn_username }}"
     password: "{{ rhn_password }}"
+    pool: "{{ rhn_pool }}"
+    server_insecure: true
+    force_register: true
+  retries: 5 # not sure why but sometimes there is a sql lock exception when waiting on this one

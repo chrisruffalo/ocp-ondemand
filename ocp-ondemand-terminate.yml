@@ -4,6 +4,14 @@
   connection: local
   gather_facts: false
   tasks:
+    - name: "Delete dynamic inventory portion"
+      file:
+        path: "./hosts/dynamic"
+        state: absent
+
+    - name: "Refresh inventory"
+      meta: refresh_inventory
+
     - name: "Gather previous bastion instance details if any exist"
       ec2_remote_facts:
         access_key: "{{ aws_access_key }}"

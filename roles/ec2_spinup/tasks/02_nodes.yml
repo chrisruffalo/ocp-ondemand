@@ -22,6 +22,10 @@
       - "{{ instance_name }}-ssh-allowed"
       - "{{ instance_name }}-all-internal-allowed"
     image: "{{ centos7_ami }}" # use a centos7 image
+    volumes:
+      - device_name: /dev/xvda # root volume
+        volume_size: 50
+        delete_on_termination: true    
     vpc_subnet_id: "{{ subnets[3].subnet.id }}" # launch in public subnet
     key_name: "{{ instance_name }}"
     wait: true
@@ -38,6 +42,7 @@
       - "{{ instance_name }}"
       - "bastion"
       - "centos"
+  changed_when: false
 
 # create OCP target hosts
 - name: "Create master/etcd hosts"
@@ -63,6 +68,13 @@
       - "{{ instance_name }}-http-https-allowed"
       - "{{ instance_name }}-all-internal-allowed"          
     image: "{{ rhel7_ami }}" # use a rhel7 image
+    volumes:
+      - device_name: /dev/xvda # root volume
+        volume_size: 50
+        delete_on_termination: true
+      - device_name: /dev/xvdb # docker volume
+        volume_size: 100
+        delete_on_termination: true  
     vpc_subnet_id: "{{ item.subnet }}" # launch in public subnet
     key_name: "{{ instance_name }}"
     wait: true
@@ -99,6 +111,13 @@
     group:
       - "{{ instance_name }}-all-internal-allowed"
     image: "{{ rhel7_ami }}" # use a rhel7 image
+    volumes:
+      - device_name: /dev/xvda # root volume
+        volume_size: 50
+        delete_on_termination: true
+      - device_name: /dev/xvdb # docker volume
+        volume_size: 100
+        delete_on_termination: true    
     vpc_subnet_id: "{{ item.subnet }}" # launch in private subnet
     key_name: "{{ instance_name }}"
     wait: true
@@ -136,6 +155,13 @@
     group:
       - "{{ instance_name }}-all-internal-allowed"
     image: "{{ rhel7_ami }}" # use a rhel7 image
+    volumes:
+      - device_name: /dev/xvda # root volume
+        volume_size: 50
+        delete_on_termination: true
+      - device_name: /dev/xvdb # docker volume
+        volume_size: 100
+        delete_on_termination: true    
     vpc_subnet_id: "{{ item.subnet }}" # launch in private subnet
     key_name: "{{ instance_name }}"
     wait: true
@@ -174,6 +200,10 @@
       - "{{ instance_name }}-http-https-allowed"
       - "{{ instance_name }}-all-internal-allowed"
     image: "{{ centos7_ami }}" # use a rhel7 image
+    volumes:
+      - device_name: /dev/xvda # root volume
+        volume_size: 50
+        delete_on_termination: true    
     vpc_subnet_id: "{{ item.subnet }}" # launch in private subnet
     key_name: "{{ instance_name }}"
     wait: true
@@ -217,13 +247,19 @@
     ansible_ssh_user: "{{ rhel_user }}" 
     ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
     ansible_become: true
+    openshift_schedulable: false
+    openshift_node_labels:
+      region: "master"
+      zone: "availability-group-{{ item.tags.availability_group }}"        
     groups: 
       - "{{ instance_name }}"
       - "master"
       - "etcd"
       - "rhel"
       - "tunneled"
+      - "nodes"
   with_items: "{{ master_instances }}"
+  changed_when: false
 
 - name: "Add infrastructure to list of hosts"
   add_host:
@@ -231,12 +267,17 @@
     ansible_ssh_user: "{{ rhel_user }}" 
     ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
     ansible_become: true
+    openshift_node_labels:
+      region: "infra"
+      zone: "availability-group-{{ item.tags.availability_group }}"    
     groups: 
       - "{{ instance_name }}"
       - "infra"
       - "rhel"
       - "tunneled"
+      - "nodes"
   with_items: "{{ infra_instances }}"
+  changed_when: false
 
 - name: "Add hosting nodes to list of hosts"
   add_host:
@@ -249,10 +290,11 @@
       zone: "availability-group-{{ item.tags.availability_group }}"
     groups: 
       - "{{ instance_name }}"
-      - "node"
       - "rhel"
       - "tunneled"
+      - "node"
   with_items: "{{ node_instances }}"
+  changed_when: false
 
 - name: "Add keycloak nodes to list of hosts"
   add_host:
@@ -265,4 +307,5 @@
       - "keycloak"
       - "centos"
       - "tunneled"
-  with_items: "{{ keycloak_instances }}"  
+  with_items: "{{ keycloak_instances }}"
+  changed_when: false

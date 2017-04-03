@@ -77,7 +77,7 @@
       - proto: all
         cidr_ip: 10.0.0.0/16
 
-- name: "Create internal postgres port"
+- name: "Create internal security group for postgres port"
   ec2_group:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
@@ -152,6 +152,45 @@
       - dest: 0.0.0.0/0
         gateway_id: "{{ igw_result.gateway_id }}"
 
+# do we already have a EIP registered?
+- name: "Check on already registered EIP"
+  stat:
+    path: "./static/eip.yml"
+  register: eip_memory_file
+
+# if so then load the vars
+- name: "If the EIP is already registered then we need to re-use the same EIP address"
+  include_vars: 
+    file: "./static/eip.yml"
+    name: "nat_eip_memory"
+  when: eip_memory_file.stat.exists
+
+# create elastic ip so we can control relase
+- name: "Create elastic IP to use for NAT gateway"
+  ec2_eip:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    in_vpc: true
+    release_on_disassociation: true
+    reuse_existing_ip_allowed: true
+    state: present
+  register: nat_eip
+  when: not eip_memory_file.stat.exists
+
+# fix fact for stable state between the file and remote
+- name: "Fact reconciliation"
+  set_fact:
+    nat_eip: "{{ nat_eip_memory }}"
+  when: not nat_eip.public_ip is defined
+
+# statically remember eip because it can't be saved... no tags, no facts about it, no good handle
+- name: "Remember EIP in YAML files"
+  copy: 
+    dest: "./static/eip.yml"
+    content: "---\n{{ nat_eip | to_nice_yaml }}"
+  when: nat_eip is defined and nat_eip.changed
+
 # create private NAT endpoint on public IP
 - name: "Create NAT gatway with associated EIP into public subnet and using it as a routing target (sometimes this task times out the first time)"
   ec2_vpc_nat_gateway:
@@ -162,6 +201,7 @@
     wait: yes
     region: "{{ aws_region }}"
     if_exist_do_not_create: true
+    eip_address: "{{ nat_eip.public_ip }}"
   retries: 3
   register: nat_gateway
 

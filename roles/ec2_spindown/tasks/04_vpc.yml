@@ -1,4 +1,74 @@
 ---
+# get information about nats
+- name: "Get NAT gateway information"
+  extras_ec2_vpc_nat_gateway_facts:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    filters:
+      vpc-id: "{{ vpc_id }}"
+  when: vpc_id is defined
+  register: vpc_nat_facts
+
+# delete options
+- name: "Delete NAT gateways"
+  ec2_vpc_nat_gateway:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: absent
+    nat_gateway_id: "{{ vpc_nat_facts.result[0].NatGatewayId }}"
+    wait: true
+  when: vpc_nat_facts.result is defined and vpc_nat_facts.result[0] is defined and vpc_nat_facts.result[0].VpcId is defined
+
+# delete EIP for NAT
+# do we already have a EIP registered?
+- name: "Check on already registered EIP"
+  stat:
+    path: "./static/eip.yml"
+  register: eip_memory_file
+
+# if so then load the vars
+- name: "Read the EIP value used by the NAT when created"
+  include_vars: 
+    file: "./static/eip.yml"
+    name: "nat_eip"
+  when: eip_memory_file.stat.exists
+
+# create elastic ip so we can control relase
+- name: "Delete elastic IP used for NAT gateway"
+  ec2_eip:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: absent
+    public_ip: "{{ nat_eip.public_ip }}"
+  when: eip_memory_file.stat.exists
+
+# remove EIP memory file
+- name: "Remove EIP memory file"
+  file:
+    path: "./static/eip.yml"
+    state: absent
+
+- name: "Gather facts about all Internet Gateways for region"
+  ec2_vpc_igw_facts:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+  register: igw_facts
+
+# create elastic ip so we can control relase
+- name: "Disocciate elastic IP used for IGW"
+  ec2_eip:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    state: absent
+    device_id: "{{ item.internet_gateway_id }}"
+  when: item.attachments[0].vpc_id == vpc_id
+  with_items: "{{ igw_facts.internet_gateways }}"
+
 # remove internet gateway
 - name: "Remove IGW"
   ec2_vpc_igw:
@@ -8,29 +78,7 @@
     vpc_id: "{{ vpc_id }}"
     state: absent
 
-# get information about nats
-- name: "Get NAT gateway information"
-  extras_ec2_vpc_nat_gateway_facts:
-    access_key: "{{ aws_access_key }}"
-    secret_key: "{{ aws_secret_key }}"
-    region: "{{ aws_region }}"
-    filters:
-      vpc-id: "{{ vpc_id }}"
-  when: vpc_net_facts.vpcs          
-  register: vpc_nat_facts
-
-# delete options
-- name: "Delete NAT gateways"
-  ec2_vpc_nat_gateway:
-    access_key: "{{ aws_access_key }}"
-    secret_key: "{{ aws_secret_key }}"
-    region: "{{ aws_region }}"
-    release_eip: yes
-    nat_gateway_id: "{{ vpc_nat_facts.id }}"
-  when: vpc_net_facts.vpcs and vpc_nat_facts and vpc_nat_facts.id is defined
-
-# todo: release ips (??)
-
+# terminate subnets
 - name: "Terminate instance VPC subnets"
   ec2_vpc_subnet:
     access_key: "{{ aws_access_key }}"
@@ -55,7 +103,7 @@
     secret_key: "{{ aws_secret_key }}"
     region: "{{ aws_region }}"        
     filters:
-      vpc-id: "{{ vpc_id }}"
+      "tag:instance": "{{ instance_name }}"
   when: vpc_net_facts.vpcs    
   register: route_table_facts    
 

@@ -19,37 +19,5 @@
     host: "{{ item }}"
   with_items: "{{ groups['tunneled'] }}"
 
-# packages required for application
-- name: "Install required packages"
-  package:
-    name: "git"
-    state: present
-
-# we need this BYO playbook to continue the run
-- name: "Checkout OCP playbook for later use"
-  git:
-    repo: "https://github.com/openshift/openshift-ansible.git"
-    dest: "/opt/openshift-ansible"
-    version: "release-1.5"
-
-# make sure facts are more accessible
-- name: "Move collected ec2 facts from localhost to a more convienient location"
-  set_fact:
-    ec2_info: "{{ hostvars['localhost']['ec2_info'] }}"
-
-- name: "Create ansible directory"
-  file:
-    state: directory
-    path: "/etc/ansible"
-    owner: "root"
-    group: "root"
-
-# write the host inventory as the default ansible inventory
-- name: "Write Host Inventory"
-  template:
-    src: "hosts.j2"
-    dest: "/etc/ansible/hosts"
-    mode: 0444
-
   
 

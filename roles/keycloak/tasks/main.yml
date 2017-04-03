@@ -24,9 +24,11 @@
     creates: "/usr/lib/python2.7/site-packages/pip-9.0.1.dist-info"
 
 # install wildfly/python connector
-- name: "Install python library for making http requests"
+- name: "Install supporting python libraries"
   pip:
-    name: "requests"
+    name: 
+      - "requests"
+      - "psycopg2" # postgres
 
 # create jboss user
 - name: "Create JBoss user"
@@ -110,39 +112,90 @@
 - name: "Add user for jboss console / local"
   command: "/opt/keycloak/bin/add-user.sh -e -s -r ManagementRealm -u {{ keycloak_admin_user}} -p \"{{ keycloak_admin_password }}\""
 
+# ensure keycloak db is created
+- postgresql_db:
+    name: "keycloak"
+    encoding: UTF-8
+    login_host: "{{ ec2_info.keycloak_db.instance.endpoint }}"
+    login_user: "keycloak"
+    login_password: "{{ keycloak_db_password }}"
+
 # start service and wait for it to be started so that changes can be made against the API
 - name: "Start Keycloak JBoss Instance because, if you don't, the commands won't work"
   service:
     name: "keycloak"
     state: started
+  register: keycloak_service_started
 
-- name: "Wait for service to be up"
+- name: "Wait for service management port to be up"
   wait_for:
-    port: 8080
+    port: 9990
+  when: keycloak_service_started.changed
+
+- name: "The management interface can take a moment to come up even after the port is open"
+  pause:
+    seconds: 8
+  when: keycloak_service_started.changed  
+
+- name: "Add Postgres driver module to Wildfly"
+  wildfly_api: 
+    username: "{{ keycloak_admin_user }}"
+    password: "{{ keycloak_admin_password }}"
+    operation: present
+    address:
+      - {"subsystem": "datasources"}
+      - {"jdbc-driver": "postgresql"}
+    parameters:
+      driver-name: "postgresql"
+      driver-module-name: "org.postgresql"          
+      driver-xa-datasource-class-name: "org.postgresql.xa.PGXADataSource"
+  register: wildfly_jdbc_driver
+
+- name: "Set/update Keycloak datasource to use Postgres"
+  wildfly_api:
+    username: "{{ keycloak_admin_user }}"
+    password: "{{ keycloak_admin_password }}"
+    operation: present
+    address:
+      - {"subsystem": "datasources"}
+      - {"data-source": "KeycloakDS"}
+    parameters:
+      driver-name: "postgresql"
+      jndi-name: "java:jboss/datasources/KeycloakDS"
+      user-name: "keycloak"
+      password: "{{ keycloak_db_password }}"
+      connection-url: "jdbc:postgresql://{{ ec2_info.keycloak_db.instance.endpoint }}/keycloak"
+      enabled: true
+      use-java-context: true
+      min-pool-size: 5
+      max-pool-size: 20
+  register: wildfly_datasource    
+
+# start service and wait for it to be started so that changes can be made against the API
+- name: "Restart when required for datasources"
+  service:
+    name: "keycloak"
+    state: restarted
+  when: wildfly_jdbc_driver.changed or wildfly_datasource.changed 
+
+- name: "Wait for service management port to be up after restart from changed data sources"
+  wait_for:
+    port: 9990    
+  when: wildfly_jdbc_driver.changed or wildfly_datasource.changed
 
 # add a keycloak user
-- name: "Add keycloak user"
-  run_once: true
-  command: "/opt/keycloak/bin/add-user-keycloak.sh -r master -u {{ keycloak_admin_user }} -p \"{{ keycloak_admin_password }}\""
+#- name: "Add keycloak user"
+#  run_once: true
+#  command: "/opt/keycloak/bin/add-user-keycloak.sh -r master -u {{ keycloak_admin_user }} -p \"{{ keycloak_admin_password }}\""
 
 # use kcadm to establish authentication realm for hosted domain/zone
 # see: https://www.keycloak.org/docs/3.0/server_admin/topics/admin-cli.html
-- name: "Authenticate keycloak admin-cli"
-  run_once: true
-  command: "/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/auth --realm master --user {{ keycloak_admin_user }} --password \"{{ keycloak_admin_password }}\""
+#- name: "Authenticate keycloak admin-cli"
+#  run_once: true
+#  command: "/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/auth --realm master --user {{ keycloak_admin_user }} --password \"{{ keycloak_admin_password }}\""
 
-- name: "Create realm for instance"
-  run_once: true
-  command: "/opt/keycloak/bin/kcadm.sh create realms -s realm='{{ safe_instance_name }}' -s enabled=true"
+#- name: "Create realm for instance"
+#  run_once: true
+#  command: "/opt/keycloak/bin/kcadm.sh create realms -s realm='{{ safe_instance_name }}' -s enabled=true"
 
 # todo: manipulate configuration files for direct ip clustering
-
-# open firewall ports
-- name: "Open firewall ports for Keycloak"
-  firewalld:
-    port: "{{ item }}"
-    state: enabled
-    immediate: true
-    permanent: true
-  with_items:
-    - 8080 # only http, https termination handled by ALB

@@ -1,31 +1,62 @@
 ---
 # playbook to create OCP on demand in a VPC in EC2 with 
-# a configurable number of nodes, a HA gitlab instance,
-# and an HA multi-tenant Eclipse CHE instance
+# a configurable number of nodes.
+
+# info
 # see more here: https://docs.openshift.com/container-platform/3.4/install_config/install/advanced_install.html#running-the-advanced-installation
+# 
 
 # create ec2 infrastructure (from localhost, making only needed changes to get the ec2 client running)
 - hosts: localhost
   connection: local
   gather_facts: false
+  tags: 
+    - "all"
+    - "spinup"
   roles: 
     - "ec2_spinup"
 
 # configure bastion host to recieve and execute commands
 - hosts: bastion
+  tags:
+    - "all"
+    - "bastion"
   roles: 
     - "common"
     - "ec2_bastion"
 
 # configure keycloak system
 - hosts: keycloak
+  tags:
+    - "all"
+    - "keycloak"
   roles:
     - "common"
     - "keycloak"
 
 # configure rhel hosts
 - hosts: rhel
+  tags:
+    - "all"
+    - "rhel"
   roles:
     - "rhn_subscribe" # need to attach to rhn before attending to common tasks
     - "common"
     - "rhel" # any rhel-specific host stuff
+
+# check out and prepare to execute byo playbook
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  tags:
+    - "all"
+    - "prep"
+  roles:
+    - "prepare"
+ 
+# from recent checkout execute the byo configuration script
+- include: "{{ playbook_dir }}/static/openshift-ansible/playbooks/byo/config.yml"
+  tags:
+    - "all"
+    - "ocp"
+

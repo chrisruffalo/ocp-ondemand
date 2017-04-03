@@ -1,0 +1,12 @@
+---
+# reload hosts/variables
+- meta: refresh_inventory
+
+# we need this BYO playbook to continue the run
+- name: "Ensure that the OCP ansible content is at the right version"
+  git:
+    repo: "https://github.com/openshift/openshift-ansible.git"
+    dest: "./static/openshift-ansible"
+    version: "release-{{ ocp_ansible_version }}"
+  register: git_checkout    
+

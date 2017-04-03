@@ -1,7 +1,8 @@
 ---
-keycloak_dist_name: "keycloak-3.0.0.CR1"
-keycloak_download_url: "https://downloads.jboss.org/keycloak/3.0.0.CR1/keycloak-3.0.0.CR1.tar.gz" # MUST BE TARBALL
-
+keycloak_version: "3.0.0.Final"
+keycloak_dist_name: "keycloak-{{ keycloak_version }}"
+keycloak_download_url: "https://downloads.jboss.org/keycloak/{{ keycloak_version }}/{{ keycloak_dist_name }}.tar.gz" # MUST BE TARBALL
+                        
 postgres_jar_name: "postgresql-42.0.0.jar"
 postgres_jar_download_url: "https://jdbc.postgresql.org/download/{{ postgres_jar_name }}"
 
