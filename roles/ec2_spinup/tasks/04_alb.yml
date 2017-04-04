@@ -10,8 +10,8 @@
   with_items: "{{ master_instances | map(attribute = 'id') | list }}" 
 
 - set_fact:
-    keycloak_http_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 80 } ] }}"
-    keycloak_https_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 443 } ] }}"
+    keycloak_http_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 8080 } ] }}"
+    keycloak_https_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 8443 } ] }}"
   with_items: "{{ keycloak_instances | map(attribute = 'id') | list }}"
 
 - name: "Create target for 80"
@@ -63,7 +63,6 @@
     security_groups:
       - "{{ instance_name }}-https-alt-allowed"
       - "{{ instance_name }}-http-https-allowed"
-    scheme: internal
     listeners:
       - Protocol: HTTPS
         Port: 443
@@ -89,7 +88,7 @@
     state: present
   register: cloud_alb_result 
 
-- name: "Create target for keycloak-80"    
+- name: "Create target for keycloak (so we can do 443 -> 8080)"    
   extras_elb_target_group:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
@@ -114,7 +113,6 @@
     security_groups:
       - "{{ instance_name }}-https-alt-allowed"
       - "{{ instance_name }}-http-https-allowed"
-    scheme: internal
     listeners:
       - Protocol: HTTPS
         Port: 443

@@ -40,9 +40,6 @@
       keycloak_db: "{{ keycloak_db_result }}"
       subnets: "{{ subnets }}"
 
-#- debug:
-#    msg: "{{ ec2_info.ds }}"
-
 # set up dynamic variables/inventory
 - name: "Copy generated/dynamic host template"
   template:

@@ -1,4 +1,5 @@
 # stuff we don't want to check in
+static/**
 **/vault.yml
 *.retry
 hosts/dynamic

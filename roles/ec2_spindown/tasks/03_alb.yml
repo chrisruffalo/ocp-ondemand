@@ -22,7 +22,7 @@
 
 - name: "Pause and wait for ALB to stop and free targets"
   pause:
-    seconds: 20
+    seconds: 60
   when: alb_remove.changed or keycloak_alb_remove.changed
 
 - name: "Delete target for 80"
@@ -52,7 +52,7 @@
     vpc_id: "{{ vpc_id }}"
     state: absent
 
-- name: "Delete target for keycloak 80"
+- name: "Delete target for keycloak 443 -> 8080"
   extras_elb_target_group:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
@@ -60,18 +60,3 @@
     name: "{{ safe_instance_name }}-keycloak-http-group"
     vpc_id: "{{ vpc_id }}"
     state: absent
-
-#- name: "Delete target for keycloak 443"
-#  extras_elb_target_group:
-#    access_key: "{{ aws_access_key }}"
-#    secret_key: "{{ aws_secret_key }}"
-#    region: "{{ aws_region }}"    
-#    name: "{{ safe_instance_name }}-keycloak-https-group"
-#    vpc_id: "{{ vpc_id }}"
-#    state: absent
-
-- name: "Pause and wait for target groups to spin down"
-  pause:
-    seconds: 5
-  when: alb_remove.changed or keycloak_alb_remove.changed
-

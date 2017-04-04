@@ -1,4 +1,15 @@
 ---
+# we don't need to keep the dynamic inventory
+- name: "Delete previous inventory, inventory will be generated"
+  file:
+    path: "./hosts/dynamic"
+    state: absent
+  register: removed_inventory
+
+# refresh (delete) dynamic items
+- meta: refresh_inventory
+  when: removed_inventory.changed
+
 # get information about VPC
 - name: "Get information about existing VPCs"
   ec2_vpc_net_facts:

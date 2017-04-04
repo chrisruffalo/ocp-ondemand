@@ -43,13 +43,21 @@
     region: "{{ aws_region }}"
     state: absent
     public_ip: "{{ nat_eip.public_ip }}"
+    wait: true
   when: eip_memory_file.stat.exists
+  register: nat_eip_delete
 
 # remove EIP memory file
 - name: "Remove EIP memory file"
   file:
     path: "./static/eip.yml"
     state: absent
+
+# wait
+- name: "Wait for EIP to be deleted so IGW can be deleted"
+  pause:
+    seconds: 30
+  when: nat_eip_delete.changed
 
 - name: "Gather facts about all Internet Gateways for region"
   ec2_vpc_igw_facts:

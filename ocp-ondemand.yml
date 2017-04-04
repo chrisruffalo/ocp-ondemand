@@ -34,13 +34,23 @@
     - "common"
     - "keycloak"
 
+# subscribe rhel hosts 1 at a time
+- hosts: rhel
+  gather_facts: false # don't need facts, just do simple subscribe before continuing
+  tags: 
+    - "all"
+    - "rhel"
+    - "subscribe"
+  roles:
+    - "rhn_subscribe" # need to attach to rhn before attending to common tasks
+  serial: 2 # limit so that RHN doesn't freak out and throw SQL exceptions
+
 # configure rhel hosts
 - hosts: rhel
   tags:
     - "all"
     - "rhel"
   roles:
-    - "rhn_subscribe" # need to attach to rhn before attending to common tasks
     - "common"
     - "rhel" # any rhel-specific host stuff
 

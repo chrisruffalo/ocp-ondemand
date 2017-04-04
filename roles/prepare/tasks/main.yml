@@ -1,5 +1,5 @@
 ---
-# reload hosts/variables
+# reload hosts/variables for OpenShift installation
 - meta: refresh_inventory
 
 # we need this BYO playbook to continue the run

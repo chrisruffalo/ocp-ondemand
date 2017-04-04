@@ -11,10 +11,8 @@ lb
 
 # Set variables common for all OSEv3 hosts
 [OSEv3:vars]
-openshift_hostname={{ hosted_zone }}
-
-openshift_release={{ ocp_version }}
-openshift_deployment_type=openshift-enterprise
+ose_version={{ ocp_version }}
+deployment_type=openshift-enterprise
 
 # Uncomment the following to enable htpasswd authentication; defaults to
 # DenyAllPasswordIdentityProvider.
@@ -66,6 +64,6 @@ openshift_master_cluster_public_hostname={{ hosted_zone }}
 {% endfor %}
 
 [keycloak]
-{% for bastion in groups['bastion'] %}
-{{ bastion }} ansible_ssh_private_key_file="static/{{ instance_name }}.id_rsa" ansible_ssh_user="{{ centos_user }}" ansible_become=true ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
+{% for keycloak in groups['keycloak'] %}
+{{ keycloak }} ansible_ssh_private_key_file="static/{{ instance_name }}.id_rsa" ansible_ssh_user="{{ centos_user }}" ansible_become=true ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
 {% endfor %}

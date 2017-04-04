@@ -111,6 +111,8 @@
 # add user for jboss admin (local / console)
 - name: "Add user for jboss console / local"
   command: "/opt/keycloak/bin/add-user.sh -e -s -r ManagementRealm -u {{ keycloak_admin_user}} -p \"{{ keycloak_admin_password }}\""
+  become: true
+  become_user: "jboss"
 
 # ensure keycloak db is created
 - postgresql_db:
@@ -134,8 +136,8 @@
 
 - name: "The management interface can take a moment to come up even after the port is open"
   pause:
-    seconds: 8
-  when: keycloak_service_started.changed  
+    seconds: 30
+  when: keycloak_service_started.changed
 
 - name: "Add Postgres driver module to Wildfly"
   wildfly_api: 
@@ -167,9 +169,11 @@
       connection-url: "jdbc:postgresql://{{ ec2_info.keycloak_db.instance.endpoint }}/keycloak"
       enabled: true
       use-java-context: true
-      min-pool-size: 5
+      min-pool-size: 1
       max-pool-size: 20
   register: wildfly_datasource    
+
+# todo: manipulate configuration for direct ip clustering when more than one keycloak host is present
 
 # start service and wait for it to be started so that changes can be made against the API
 - name: "Restart when required for datasources"
@@ -183,19 +187,54 @@
     port: 9990    
   when: wildfly_jdbc_driver.changed or wildfly_datasource.changed
 
-# add a keycloak user
-#- name: "Add keycloak user"
-#  run_once: true
-#  command: "/opt/keycloak/bin/add-user-keycloak.sh -r master -u {{ keycloak_admin_user }} -p \"{{ keycloak_admin_password }}\""
+# add a keycloak user (on each server)
+- name: "Add keycloak user"
+  command: "/opt/keycloak/bin/add-user-keycloak.sh -r master -u {{ keycloak_admin_user }} -p \"{{ keycloak_admin_password }}\""
+  become: true
+  become_user: "jboss"
+  register: kc_add_user
+  changed_when: "\"Added '\" + keycloak_admin_user + \"'\" in kc_add_user.stdout"
+  failed_when: "kc_add_user.stderr is defined and kc_add_user.stderr !=\"\" and not (\"User with username '\" + keycloak_admin_user + \"' already added\" in kc_add_user.stderr)"
+
+# start service and wait for it to be started so that changes can be made against the API
+- name: "Restart when required for new keycloak user"
+  service:
+    name: "keycloak"
+    state: restarted
+  when: kc_add_user.changed
+
+- name: "Wait for service port to be up after restart from changed keycloak user"
+  wait_for:
+    port: 8080
+  when: kc_add_user.changed
+
+- name: "Wait for a few seconds to ensure interface is up and running"  
+  pause:
+    seconds: 30
+  when: kc_add_user.changed
 
 # use kcadm to establish authentication realm for hosted domain/zone
 # see: https://www.keycloak.org/docs/3.0/server_admin/topics/admin-cli.html
-#- name: "Authenticate keycloak admin-cli"
-#  run_once: true
-#  command: "/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/auth --realm master --user {{ keycloak_admin_user }} --password \"{{ keycloak_admin_password }}\""
+- name: "Authenticate keycloak admin-cli"
+  run_once: true
+  command: "/opt/keycloak/bin/kcadm.sh config credentials --server http://localhost:8080/auth --realm master --user {{ keycloak_admin_user }} --password \"{{ keycloak_admin_password }}\""
+  become: true
+  become_user: "jboss"
+  changed_when: false
 
-#- name: "Create realm for instance"
-#  run_once: true
-#  command: "/opt/keycloak/bin/kcadm.sh create realms -s realm='{{ safe_instance_name }}' -s enabled=true"
+- name: "Create realm for instance"
+  run_once: true
+  command: "/opt/keycloak/bin/kcadm.sh create realms -s realm='{{ safe_instance_name }}' -s enabled=true"
+  become: true
+  become_user: "jboss"
+  register: kc_add_realm
+  changed_when: "(\"Created new realm with id '\" + safe_instance_name + \"'\") in kc_add_realm.stdout"
+  failed_when: "kc_add_realm.stderr is defined and kc_add_user.stderr !=\"\" and not \"Realm with same name exists\" in kc_add_realm.stderr"
 
-# todo: manipulate configuration files for direct ip clustering
+# todo: create openid target for openshift  
+
+# done to prevent issues later
+- name: "Logout of keycloak admin by deleting credentials file"
+  file:
+    path: "/home/jboss/.keycloak/kcadm.config"
+    state: absent

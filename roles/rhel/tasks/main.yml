@@ -1,16 +1,12 @@
 ---
 - name: "Enable base set of repositories"
-  command: "subscription-manager repos --disable=rhel* --enable=rhel-7-server-rpms --enable=rhel-7-server-optional-rpms --enable=rhel-7-server-eus-rpms --enable=rhel-7-server-eus-optional-rpms --enable=rhel-7-server-aus-rpms --enable=rhel-7-server-aus-optional-rpms"
-  register: repos_enabled
-
-- name: "Enable OSE/OCP required repositories"
-  command: "subscription-manager repos --enable=rhel-7-server-extras-rpms --enable=rhel-7-server-ose-{{ ocp_version }}-rpms"
-  register: ocp_repos_enabled
+  command: "subscription-manager repos --disable=\"*\" --enable=rhel-7-server-rpms --enable=rhel-7-server-extras-rpms --enable=rhel-7-server-ose-{{ ocp_version }}-rpms"
 
 - name: "Ensure required packages are installed"
   yum:
     state: present
     name:
+      - "deltarpm"
       - "wget"
       - "git"
       - "net-tools"
@@ -18,10 +14,10 @@
       - "iptables-services"
       - "bridge-utils"
       - "bash-completion"
+      - "docker"
       - "atomic-openshift-utils"
       - "atomic-openshift-excluder"
       - "atomic-openshift-docker-excluder"
-      - "docker"
 
 - name: "Update all packages"
   yum:
