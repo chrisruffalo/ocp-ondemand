@@ -49,6 +49,7 @@
 
 # unsubscribe from rhel subscriptions
 - hosts: rhel
+  serial: 4 # don't overload it
   roles:
     - "rhn_unsubscribe"
 

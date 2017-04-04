@@ -43,7 +43,6 @@
     region: "{{ aws_region }}"
     state: absent
     public_ip: "{{ nat_eip.public_ip }}"
-    wait: true
   when: eip_memory_file.stat.exists
   register: nat_eip_delete
 
