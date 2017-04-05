@@ -9,6 +9,8 @@
 
 # ensure that the cloud host name is managed by route53
 - route53_zone:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
     zone: "{{ hosted_zone }}"
     state: present
   when: manage_host

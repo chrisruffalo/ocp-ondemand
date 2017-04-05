@@ -201,8 +201,8 @@
 # add a keycloak user (on each server)
 - name: "Add keycloak user"
   command: "/opt/keycloak/bin/add-user-keycloak.sh -r master -u {{ keycloak_admin_user }} -p \"{{ keycloak_admin_password }}\""
-    args:
-      creates: "/opt/keycloak/standalone/configuration/keycloak-add-user.json"
+  args:
+    creates: "/opt/keycloak/standalone/configuration/keycloak-add-user.json"
   become: true
   become_user: "jboss"
   register: kc_add_user

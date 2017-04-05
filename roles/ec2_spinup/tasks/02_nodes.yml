@@ -236,6 +236,33 @@
     keycloak_instances: "{{ keycloak_instances | default([]) + item.tagged_instances }}"
   with_items: "{{ keycloak_result.results }}"    
 
+# create internal hostnames
+- route53_zone:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    zone: "cloud.local"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+
+- name: "Set list of internal master IPs"
+  set_fact:
+    master_host_list: "{{ master_instances | map(attribute='private_ip') | list | join(',') }}"
+
+- name: "Create a private cloud master round-robin zone"
+  route53:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    zone: "cloud.local"
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    private_zone: true
+    command: "create"
+    record: "masters.cloud.local"
+    type: "A"
+    ttl: 7200
+    value: "{{ master_host_list }}"
+
+# todo: more internal dns names
+
 - name: "Wait for bastion host to come up"
   wait_for:
     host: "{{ bastion_result.tagged_instances[0].public_ip }}"
