@@ -64,6 +64,21 @@
         from_port: 8443
         cidr_ip: 0.0.0.0/0  
 
+- name: "Create 8080-allowed security group"
+  ec2_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    description: "allows HTTP-alt access on 8080"
+    name: "{{ instance_name }}-http-alt-allowed"
+    region: "{{ aws_region }}"
+    state: present
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    rules:
+      - proto: tcp
+        to_port: 8080
+        from_port: 8080
+        cidr_ip: 0.0.0.0/0  
+
 - name: "Create internal allow-all security group"
   ec2_group:
     access_key: "{{ aws_access_key }}"

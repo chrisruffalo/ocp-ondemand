@@ -1,0 +1,4 @@
+---
+# exclude packages
+- name: "We don't need to update/install at this point and it is safer to exclude"
+  command: "atomic-openshift-excluder exclude"

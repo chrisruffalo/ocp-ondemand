@@ -153,6 +153,7 @@
     region: "{{ aws_region }}"
     assign_public_ip: no # no public access
     group:
+      - "{{ instance_name }}-http-alt-allowed"
       - "{{ instance_name }}-all-internal-allowed"
     image: "{{ rhel7_ami }}" # use a rhel7 image
     volumes:

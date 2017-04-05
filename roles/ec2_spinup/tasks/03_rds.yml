@@ -34,10 +34,10 @@
     maint_window: "Mon:23:00-Tue:03:15"
   register: keycloak_db_create_result
 
-# wait for 3(!!!) minutes
+# wait for (!!!) minutes
 - name: "Wait for RDS because the wait=true on the create RDS takes longer than the timeout window"
   pause:
-    minutes: 3
+    minutes: 5
   when: keycloak_db_create_result.changed
 
 # create RDS for keycloak, this might seem a little weird but this is because we've waited 

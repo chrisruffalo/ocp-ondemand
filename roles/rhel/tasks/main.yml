@@ -1,6 +1,30 @@
 ---
-- name: "Enable base set of repositories"
+- name: "Set information about repos"
+  set_fact:
+    desired_repos:
+      - "rhel-7-server-rpms"
+      - "rhel-7-server-extras-rpms"
+      - "rhel-7-server-ose-{{ ocp_version }}-rpms"
+    found_repos: []
+
+- name: "Collect information on enabled repositories"
+  shell: "subscription-manager repos --list-enabled | grep \"Repo ID\" | awk '{print $3}'"
+  register: enabled_subscriptions
+
+- name: "Check that desired repositories are found in the list of repositories"
+  set_fact:
+    found_repos: found_repos + [item]
+  when: item in enabled_subscriptions.stdout_lines
+  with_items: "desired_repos"
+
+- name: "Enable base set of repositories when they are not present"
   command: "subscription-manager repos --disable=\"*\" --enable=rhel-7-server-rpms --enable=rhel-7-server-extras-rpms --enable=rhel-7-server-ose-{{ ocp_version }}-rpms"
+  register: subscription_repos
+  when: (found_repos | length) != (desired_repos | length)
+
+- name: "Refresh subscription"
+  command: "subscription-manager refresh"
+  when: subscription_repos.changed
 
 - name: "Ensure required packages are installed"
   yum:
@@ -15,14 +39,32 @@
       - "bridge-utils"
       - "bash-completion"
       - "docker"
+      - "atomic-openshift"
       - "atomic-openshift-utils"
+  register: installed_packages
+
+- name: "Ensure excluder packages are installed"
+  yum:
+    state: present
+    name:
       - "atomic-openshift-excluder"
       - "atomic-openshift-docker-excluder"
+  register: excluder_installed_packages
+
+# remove openshift packages from update exclusion
+- name: "Remove openshift packages from exclusion so that they can be installed"
+  command: "atomic-openshift-excluder unexclude"
 
 - name: "Update all packages"
   yum:
     name: "*"
     state: latest
+  register: updated_packages
+
+- name: "Clean YUM"
+  command: "yum clean all"
+  changed_when: false
+  when: installed_packages.changed or updated_packages.changed or excluder_installed_packages.changed
 
 - name: "Set up Docker to use an insecure registry"
   lineinfile:
