@@ -5,6 +5,7 @@
       - "rhel-7-server-rpms"
       - "rhel-7-server-extras-rpms"
       - "rhel-7-server-ose-{{ ocp_version }}-rpms"
+      - "rhel-server-rhscl-7-rpms" #python pip, just in case
     found_repos: []
 
 - name: "Collect information on enabled repositories"
@@ -16,6 +17,11 @@
     found_repos: found_repos + [item]
   when: item in enabled_subscriptions.stdout_lines
   with_items: "desired_repos"
+
+- name: "Create repos list"
+  set_fact:
+    repo_subscribe_list: "{{ repo_subscribe_list | default([]) + [ \"--enabled=\" + item ] }}"
+  with_items: "{{ desired_repos }}"
 
 - name: "Enable base set of repositories when they are not present"
   command: "subscription-manager repos --disable=\"*\" --enable=rhel-7-server-rpms --enable=rhel-7-server-extras-rpms --enable=rhel-7-server-ose-{{ ocp_version }}-rpms"

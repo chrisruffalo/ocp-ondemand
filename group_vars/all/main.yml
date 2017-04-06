@@ -51,6 +51,7 @@ manage_host: true # set this to true if it is ok that this script creates a host
                   # you will still need to set your domain servers to point to this entry from outside of amazon unless you 
                   # use them to manage your domains.
 # the hosted zone
-hosted_zone: "{{ vault_hosted_zone }}"
+internal_zone: "cloud.local" # the root domain internally for host names and inside access
+hosted_zone: "{{ vault_hosted_zone }}" # the root domain for external use, vaulted here so it isn't leaked onto git
 # the certificate arn for use by the ALB (application load balancer)
 certificate_arn: "{{ vault_certificate_arn }}"

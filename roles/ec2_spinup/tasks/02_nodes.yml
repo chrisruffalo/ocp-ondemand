@@ -237,12 +237,20 @@
   with_items: "{{ keycloak_result.results }}"    
 
 # create internal hostnames
-- route53_zone:
+- name: "Create VPC-specific zone for local cloud domain"
+  route53_zone:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
-    zone: "cloud.local"
+    zone: "{{ internal_zone }}"
     state: present
     vpc_id: "{{ vpc_result.vpc.id }}"
+    comment: "private zone for {{ instance_name }} (vpc: {{ vpc_result.vpc.id }})"
+  register: created_cloud_zone  
+
+- name: "Wait for zone creation to take effect"
+  pause:
+    seconds: 30
+  when: created_cloud_zone.changed
 
 - name: "Set list of internal master IPs"
   set_fact:
@@ -252,11 +260,11 @@
   route53:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
-    zone: "cloud.local"
+    zone: "{{ internal_zone }}"
     vpc_id: "{{ vpc_result.vpc.id }}"
     private_zone: true
     command: "create"
-    record: "masters.cloud.local"
+    record: "masters.{{ internal_zone }}"
     type: "A"
     ttl: 7200
     value: "{{ master_host_list }}"

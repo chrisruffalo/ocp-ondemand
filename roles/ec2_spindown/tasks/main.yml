@@ -21,3 +21,4 @@
 
 # remove networking
 - include: "04_vpc.yml"
+  when: vpc_id is defined # if no vpc then skip the whole vpc section

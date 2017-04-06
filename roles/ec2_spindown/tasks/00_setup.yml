@@ -10,6 +10,11 @@
 - meta: refresh_inventory
   when: removed_inventory.changed
 
+# start with empty vpc_id
+- name: "Set empty VPC id"
+  set_fact:
+    vpc_id: None
+
 # get information about VPC
 - name: "Get information about existing VPCs"
   ec2_vpc_net_facts:
@@ -20,8 +25,10 @@
       "tag:Name": "{{ instance_name }}-vpc"
   register: vpc_net_facts
 
-- set_fact:
-    vpc_id: "{{ vpc_net_facts.vpcs[0].id }}"
+- name: "Extract VPC ID for easier use"
+  set_fact:
+    vpc_id: "{{ vpc_net_facts.vpcs[0].id | default(None) }}"
+  when: vpc_net_facts.vpcs is defined and vpc_net_facts.vpcs | length > 0
 
 # get information about subnets
 - name: "Get subnet information"

@@ -17,3 +17,38 @@
     state: absent
     instance_ids: "{{ previous_instance_ec2_facts.instances | map(attribute = 'id') | list }}"
   when: previous_instance_ec2_facts.instances 
+
+# remove internal DNS entries and zone
+- name: List all hosted zones
+  route53_facts:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    query: hosted_zone
+  register: hosted_zones
+
+- debug:
+    var: hosted_zones
+
+#- name: "Delete private cloud master round-robin zone"
+#  route53:
+#    access_key: "{{ aws_access_key }}"
+#    secret_key: "{{ aws_secret_key }}"
+#    zone: "cloud.local"
+#    vpc_id: "{{ vpc_id }}"
+#    type: "A"
+#    private_zone: true
+#    command: "delete"
+#    record: "masters.cloud.local"
+#    value: ""
+#  when: vpc_id is defined
+#
+#- name: "Remove internal cloud zone"
+#  route53_zone:
+#    access_key: "{{ aws_access_key }}"
+#    secret_key: "{{ aws_secret_key }}"
+#    zone: "cloud.local"
+#    state: absent
+#    vpc_id: "{{ vpc_id }}"
+#  when: vpc_id is defined    
+
+

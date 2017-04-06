@@ -22,7 +22,7 @@
 
 - name: "Pause and wait for ALB to stop and free targets"
   pause:
-    seconds: 60
+    seconds: 160
   when: alb_remove.changed or keycloak_alb_remove.changed
 
 - name: "Delete target for 80"
@@ -33,6 +33,7 @@
     name: "{{ safe_instance_name }}-http-group"
     vpc_id: "{{ vpc_id }}"
     state: absent
+  when: vpc_id is defined
 
 - name: "Delete target for 443"
   extras_elb_target_group:
@@ -42,6 +43,7 @@
     name: "{{ safe_instance_name }}-https-group"
     vpc_id: "{{ vpc_id }}"
     state: absent
+  when: vpc_id is defined    
 
 - name: "Delete target for 8443"
   extras_elb_target_group:
@@ -51,6 +53,7 @@
     name: "{{ safe_instance_name }}-https-alt-group"
     vpc_id: "{{ vpc_id }}"
     state: absent
+  when: vpc_id is defined    
 
 - name: "Delete target for keycloak 443 -> 8080"
   extras_elb_target_group:
@@ -60,3 +63,4 @@
     name: "{{ safe_instance_name }}-keycloak-http-group"
     vpc_id: "{{ vpc_id }}"
     state: absent
+  when: vpc_id is defined    
