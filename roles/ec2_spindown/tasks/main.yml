@@ -22,3 +22,9 @@
 # remove networking
 - include: "04_vpc.yml"
   when: vpc_id is defined # if no vpc then skip the whole vpc section
+
+# remove instance facts
+- name: "Remove instance facts"
+  file:
+    path: "static/{{ safe_instance_name }}/ec2_info.yml"
+    state: absent

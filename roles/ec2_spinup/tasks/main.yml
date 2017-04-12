@@ -7,43 +7,38 @@
       - "boto3"
       - "pyOpenSSL"
 
-# ensure that the cloud host name is managed by route53
-- route53_zone:
-    access_key: "{{ aws_access_key }}"
-    secret_key: "{{ aws_secret_key }}"
-    zone: "{{ hosted_zone }}"
-    state: present
-  when: manage_host
+# check for previous ec2 info
+- name: "Check if EC2 instance information exists"
+  stat:
+    path: "static/{{ safe_instance_name }}/ec2_info.yml"
+  register: ec2_info_stat
 
-# pre-vpc stuff (like keypair)
-- include: "00_setup.yml"
-
-# vpc and networking bits
-- include: "01_vpc.yml"
-
-# spin up nodes
-- include: "02_nodes.yml"
-
-# create and manage database instance
-- include: "03_rds.yml"
-
-# set up application load balancing
-- include: "04_alb.yml"
-
-# we need to keep some facts from this run
-# you can get here via: `hostvars['localhost']['ec2_info']` from elsewhere
-- name: "Maintain facts to use later in the run by other modules"
-  set_fact:
-    ec2_info:
-      masters: " {{ master_instances }}"
-      infras: "{{ infra_instances }}"
-      nodes: "{{ node_instances }}"
-      keycloak: "{{ keycloak_instances }}"
-      keycloak_db: "{{ keycloak_db_result }}"
-      subnets: "{{ subnets }}"
+# if there is no information you can spinup the instances or if force_spinup is true
+- include: "spinup.yml"
+  when: (not ec2_info_stat.stat.exists) or (force_spinup | bool)
+  
+# if spun up already and no ec2_info is loaded directly we can load it here
+- name: "Load information from ec2_info.yml if it was not loaded during spinup phase"  
+  include_vars: 
+    file: "./static/{{ safe_instance_name }}/ec2_info.yml"
+    name: "ec2_info"
+  register: ec2_loaded
+  when: not ec2_info is defined
 
 # set up dynamic variables/inventory
 - name: "Copy generated/dynamic host template"
   template:
     dest: "./hosts/dynamic"
     src: "dynamic_hosts.j2"
+  register: new_hosts
+
+# reload host information
+- name: "Reload host information"
+  meta: refresh_inventory
+  when: ec2_loaded.changed or new_hosts.changed
+
+# we can't continue without this information
+- name: "Fail if no instance information is found"
+  fail:
+    msg: "No ec2_info present, spinup or reading values has failed"
+  when: not ec2_info is defined

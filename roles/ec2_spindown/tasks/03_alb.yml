@@ -60,7 +60,17 @@
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
     region: "{{ aws_region }}"    
-    name: "{{ safe_instance_name }}-keycloak-http-group"
+    name: "{{ safe_instance_name }}-kc-http-group"
+    vpc_id: "{{ vpc_id }}"
+    state: absent
+  when: vpc_id is defined    
+
+- name: "Delete target for keycloak 443 -> 8080"
+  extras_elb_target_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-kc-http-re-group"
     vpc_id: "{{ vpc_id }}"
     state: absent
   when: vpc_id is defined    

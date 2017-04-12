@@ -1,0 +1,48 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+  - name: "authenticate"
+    uri:  
+      method: POST
+      url: "http://localhost:8080/auth/realms/master/protocol/openid-connect/token"
+      body: "username=keycloak&password=keycloak&grant_type=password&client_id=admin-cli"
+      return_content: true
+    register: authenticate_response
+
+  - name: "get realm if it exists"
+    uri:
+      method: GET
+      url: "http://localhost:8080/auth/admin/realms/{{ safe_instance_name }}"
+      headers:
+        'Authorization': "{{ authenticate_response.json.token_type }} {{ authenticate_response.json.access_token }}"
+      return_content: true
+    register: realm_response
+    failed_when: not (realm_response.status == 200 or realm_response.status == 404)
+
+  - name: "create new realm"
+    uri:
+      method: POST
+      url: "http://localhost:8080/auth/admin/realms"
+      headers:
+        'Authorization': "{{ authenticate_response.json.token_type }} {{ authenticate_response.json.access_token }}"
+      body: "{'id': '{{ safe_instance_name }}', 'realm': '{{ safe_instance_name }}', 'displayName': 'OCP Realm'}"
+      body_format: json
+      return_content: true
+      changed_when: realm_creation.status == 201
+      failed_when: not (realm_creation.status == 200 or realm_creation.status = 201)
+    register: realm_creation
+    when: "realm_response.status == 404" # when realm is not found
+
+  - name: "get client template in realm"
+    command: true
+
+  - name: "create client template if none is found"
+    command: true
+
+  - name: "get client in realm"
+    command: true
+
+  - name: "create client if not found"
+    command: true

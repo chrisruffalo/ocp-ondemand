@@ -1,0 +1,43 @@
+---
+# ensure that the cloud host name is managed by route53
+- name: "Ensure that the desired zone is present if manage_host is true"
+  route53_zone:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    zone: "{{ hosted_zone }}"
+    state: present
+  when: manage_host
+
+# pre-vpc stuff (like keypair)
+- include: "00_setup.yml"
+
+# vpc and networking bits
+- include: "01_vpc.yml"
+
+# spin up nodes
+- include: "02_nodes.yml"
+
+# create and manage database instance
+- include: "03_rds.yml"
+
+# set up application load balancing
+- include: "04_alb.yml"
+
+# we need to keep some facts from this run
+# you can get here via: `hostvars['localhost']['ec2_info']` from elsewhere
+- name: "Maintain facts to use later in the run by other modules"
+  set_fact:
+    ec2_info:
+      bastions: "{{ bastion_instances }}"
+      masters: "{{ master_instances }}"
+      infras: "{{ infra_instances }}"
+      nodes: "{{ node_instances }}"
+      keycloak: "{{ keycloak_instances }}"
+      keycloak_db: "{{ keycloak_db_result }}"
+      subnets: "{{ subnets }}"
+
+# write facts to external file to preserve for later
+- name: "Write instance facts to YAML for later use when skipping spinup"
+  copy: 
+    dest: "./static/{{ safe_instance_name }}/ec2_info.yml"
+    content: "---\n{{ ec2_info | to_nice_yaml }}"

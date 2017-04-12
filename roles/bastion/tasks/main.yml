@@ -1,13 +1,13 @@
 ---
 - name: "Copy id_rsa to use inside protected networks"
   copy:
-    src: "static/{{ instance_name }}.id_rsa"
+    src: "static/{{ safe_instance_name }}/identity.id_rsa"
     dest: "/root/.ssh/id_rsa"
     mode: 0400
 
 - name: "Copy id_rsa to use inside protected networks"
   copy:
-    src: "static/{{ instance_name }}.id_rsa"
+    src: "static/{{ safe_instance_name }}/identity.id_rsa"
     dest: "/home/{{ centos_user }}/.ssh/id_rsa"
     owner: "{{ centos_user }}"
     group: "{{ centos_user }}"

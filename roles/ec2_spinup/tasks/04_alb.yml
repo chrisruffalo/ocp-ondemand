@@ -9,11 +9,6 @@
     https_alt_targets: "{{ https_alt_targets | default([]) + [ {'Id': item, 'Port': 443 } ] }}"
   with_items: "{{ master_instances | map(attribute = 'id') | list }}" 
 
-- set_fact:
-    keycloak_http_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 8080 } ] }}"
-    keycloak_https_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 8443 } ] }}"
-  with_items: "{{ keycloak_instances | map(attribute = 'id') | list }}"
-
 - name: "Create target for 80"
   extras_elb_target_group:
     access_key: "{{ aws_access_key }}"
@@ -36,6 +31,8 @@
     port: 443
     vpc_id: "{{ vpc_result.vpc.id }}"
     targets: "{{ https_targets }}"
+    healthy_threshold_count: 2
+    unhealthy_threshold_count: 10
     state: present
 
 - name: "Create target for 8443"
@@ -48,6 +45,8 @@
     port: 8443
     vpc_id: "{{ vpc_result.vpc.id }}"
     targets: "{{ https_alt_targets }}"
+    healthy_threshold_count: 2
+    unhealthy_threshold_count: 10
     state: present
 
 - name: "Create an ALB load balancer for the cloud/master application"
@@ -57,9 +56,9 @@
     region: "{{ aws_region }}"    
     name: "{{ safe_instance_name }}-alb-ocp"
     subnets:
-      - "{{ subnets[0].subnet.id }}" # zone a
-      - "{{ subnets[1].subnet.id }}" # zone b
-      - "{{ subnets[2].subnet.id }}" # zone c
+      - "{{ subnets[3].subnet.id }}" # public zone a
+      - "{{ subnets[4].subnet.id }}" # public zone b
+      - "{{ subnets[5].subnet.id }}" # public zone c
     security_groups:
       - "{{ instance_name }}-https-alt-allowed"
       - "{{ instance_name }}-http-https-allowed"
@@ -88,16 +87,40 @@
     state: present
   register: cloud_alb_result 
 
-- name: "Create target for keycloak (so we can do 443 -> 8080)"    
+- set_fact:
+    keycloak_redirect_targets: "{{ keycloak_redirect_targets | default([]) + [ {'Id': item, 'Port': 80 } ] }}"
+    keycloak_http_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 8000 } ] }}"
+    #keycloak_https_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 8443 } ] }}"
+  with_items: "{{ keycloak_instances | map(attribute = 'id') | list }}"
+
+- name: "Create target for keycloak (so we can do 80 -> redirect -> 443)"    
   extras_elb_target_group:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
     region: "{{ aws_region }}"    
-    name: "{{ safe_instance_name }}-keycloak-http-group"
+    name: "{{ safe_instance_name }}-kc-http-re-group"
     protocol: "http"
-    port: 8080
+    port: 80
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    targets: "{{ keycloak_redirect_targets }}"
+    healthy_threshold_count: 2
+    unhealthy_threshold_count: 10
+    successful_response_codes: "200,301" # redirect is also a success code
+    state: present
+
+- name: "Create target for keycloak (so we can do 443 -> 8000 -> nginx proxy pass -> 8080)"
+  extras_elb_target_group:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-kc-http-group"
+    protocol: "http"
+    port: 8000
     vpc_id: "{{ vpc_result.vpc.id }}"
     targets: "{{ keycloak_http_targets }}"
+    healthy_threshold_count: 2
+    unhealthy_threshold_count: 10
+    successful_response_codes: "200,301" # redirect is also a success code in this case because a health check @ / redirects to /auth    
     state: present
 
 - name: "Create an ALB load balancer for the login/keycloak application"
@@ -107,18 +130,23 @@
     region: "{{ aws_region }}"    
     name: "{{ safe_instance_name }}-alb-keycloak"
     subnets:
-      - "{{ subnets[0].subnet.id }}" # zone a
-      - "{{ subnets[1].subnet.id }}" # zone b
-      - "{{ subnets[2].subnet.id }}" # zone c
+      - "{{ subnets[3].subnet.id }}" # public zone a
+      - "{{ subnets[4].subnet.id }}" # public zone b
+      - "{{ subnets[5].subnet.id }}" # public zone c 
     security_groups:
       - "{{ instance_name }}-https-alt-allowed"
       - "{{ instance_name }}-http-https-allowed"
     listeners:
+      - Protocol: HTTP
+        Port: 80
+        DefaultActions:
+          - Type: forward
+            TargetGroupName: "{{ safe_instance_name }}-kc-http-re-group"
       - Protocol: HTTPS
         Port: 443
         DefaultActions:
           - Type: forward
-            TargetGroupName: "{{ safe_instance_name }}-keycloak-http-group"
+            TargetGroupName: "{{ safe_instance_name }}-kc-http-group"
         Certificates:
           - CertificateArn: "{{ certificate_arn }}"
         SslPolicy: "ELBSecurityPolicy-TLS-1-2-2017-01" # very strict policy
@@ -136,7 +164,7 @@
     type: "CNAME"
     value: "{{ cloud_alb_result.load_balancer.dns_name }}"
     overwrite: true
-    ttl: 360
+    ttl: 120
   when: manage_host and cloud_alb_result and cloud_alb_result.load_balancer
 
 # and to "login.{{ hosted_zone }}"
@@ -150,5 +178,5 @@
     type: "CNAME"
     value: "{{ keycloak_alb_result.load_balancer.dns_name }}"
     overwrite: true
-    ttl: 360
+    ttl: 120
   when: manage_host and keycloak_alb_result and keycloak_alb_result.load_balancer  

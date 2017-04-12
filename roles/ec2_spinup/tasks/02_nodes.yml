@@ -23,7 +23,7 @@
       - "{{ instance_name }}-all-internal-allowed"
     image: "{{ centos7_ami }}" # use a centos7 image
     volumes:
-      - device_name: /dev/xvda # root volume
+      - device_name: /dev/sda1 # root volume
         volume_size: 50
         delete_on_termination: true    
     vpc_subnet_id: "{{ subnets[3].subnet.id }}" # launch in public subnet
@@ -35,7 +35,7 @@
 - name: "Add bastion host to list of hosts"
   add_host:
     name: "{{ bastion_result.tagged_instances[0].public_ip }}"
-    ansible_ssh_private_key_file: "static/{{ instance_name }}.id_rsa"
+    ansible_ssh_private_key_file: "static/{{ safe_instance_name }}/identity.id_rsa"
     ansible_ssh_user: "{{ centos_user }}"
     ansible_become: true
     groups: 
@@ -69,7 +69,7 @@
       - "{{ instance_name }}-all-internal-allowed"          
     image: "{{ rhel7_ami }}" # use a rhel7 image
     volumes:
-      - device_name: /dev/xvda # root volume
+      - device_name: /dev/sda1 # root volume
         volume_size: 50
         delete_on_termination: true
       - device_name: /dev/xvdb # docker volume
@@ -112,7 +112,7 @@
       - "{{ instance_name }}-all-internal-allowed"
     image: "{{ rhel7_ami }}" # use a rhel7 image
     volumes:
-      - device_name: /dev/xvda # root volume
+      - device_name: /dev/sda1 # root volume
         volume_size: 50
         delete_on_termination: true
       - device_name: /dev/xvdb # docker volume
@@ -157,7 +157,7 @@
       - "{{ instance_name }}-all-internal-allowed"
     image: "{{ rhel7_ami }}" # use a rhel7 image
     volumes:
-      - device_name: /dev/xvda # root volume
+      - device_name: /dev/sda1 # root volume
         volume_size: 50
         delete_on_termination: true
       - device_name: /dev/xvdb # docker volume
@@ -202,7 +202,7 @@
       - "{{ instance_name }}-all-internal-allowed"
     image: "{{ centos7_ami }}" # use a rhel7 image
     volumes:
-      - device_name: /dev/xvda # root volume
+      - device_name: /dev/sda1 # root volume
         volume_size: 50
         delete_on_termination: true    
     vpc_subnet_id: "{{ item.subnet }}" # launch in private subnet
@@ -231,6 +231,10 @@
     node_instances: "{{ node_instances | default([]) + item.tagged_instances }}"
   with_items: "{{ node_result.results }}"    
 
+- name: "Merge variables for bastion instances"
+  set_fact:
+    bastion_instances: "{{ bastion_instances | default([]) + bastion_result.tagged_instances }}"
+
 - name: "Merge variables for keycloak instances"
   set_fact:
     keycloak_instances: "{{ keycloak_instances | default([]) + item.tagged_instances }}"
@@ -238,19 +242,16 @@
 
 # create internal hostnames
 - name: "Create VPC-specific zone for local cloud domain"
-  route53_zone:
+  extras_route53_zone:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
     zone: "{{ internal_zone }}"
     state: present
     vpc_id: "{{ vpc_result.vpc.id }}"
+    vpc_region: "{{ aws_region }}"
     comment: "private zone for {{ instance_name }} (vpc: {{ vpc_result.vpc.id }})"
   register: created_cloud_zone  
-
-- name: "Wait for zone creation to take effect"
-  pause:
-    seconds: 30
-  when: created_cloud_zone.changed
 
 - name: "Set list of internal master IPs"
   set_fact:
@@ -268,80 +269,10 @@
     type: "A"
     ttl: 7200
     value: "{{ master_host_list }}"
+    overwrite: true
 
 # todo: more internal dns names
-
 - name: "Wait for bastion host to come up"
   wait_for:
     host: "{{ bastion_result.tagged_instances[0].public_ip }}"
     port: 22
-
-# add various hosts to different groups in ansible
-- name: "Add masters to list of hosts"
-  add_host:
-    name: "{{ item.private_ip }}"
-    ansible_ssh_user: "{{ rhel_user }}" 
-    ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
-    ansible_become: true
-    openshift_schedulable: false
-    openshift_node_labels:
-      region: "master"
-      zone: "availability-group-{{ item.tags.availability_group }}"        
-    groups: 
-      - "{{ instance_name }}"
-      - "master"
-      - "etcd"
-      - "rhel"
-      - "tunneled"
-      - "nodes"
-  with_items: "{{ master_instances }}"
-  changed_when: false
-
-- name: "Add infrastructure to list of hosts"
-  add_host:
-    name: "{{ item.private_ip }}"
-    ansible_ssh_user: "{{ rhel_user }}" 
-    ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
-    ansible_become: true
-    openshift_node_labels:
-      region: "infra"
-      zone: "availability-group-{{ item.tags.availability_group }}"    
-    groups: 
-      - "{{ instance_name }}"
-      - "infra"
-      - "rhel"
-      - "tunneled"
-      - "nodes"
-  with_items: "{{ infra_instances }}"
-  changed_when: false
-
-- name: "Add hosting nodes to list of hosts"
-  add_host:
-    name: "{{ item.private_ip }}"
-    ansible_ssh_user: "{{ rhel_user }}" 
-    ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
-    ansible_become: true
-    openshift_node_labels:
-      region: "primary"
-      zone: "availability-group-{{ item.tags.availability_group }}"
-    groups: 
-      - "{{ instance_name }}"
-      - "rhel"
-      - "tunneled"
-      - "node"
-  with_items: "{{ node_instances }}"
-  changed_when: false
-
-- name: "Add keycloak nodes to list of hosts"
-  add_host:
-    name: "{{ item.private_ip }}"
-    ansible_ssh_user: "{{ centos_user }}" 
-    ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
-    ansible_become: true
-    groups: 
-      - "{{ instance_name }}"
-      - "keycloak"
-      - "centos"
-      - "tunneled"
-  with_items: "{{ keycloak_instances }}"
-  changed_when: false

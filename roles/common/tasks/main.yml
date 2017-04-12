@@ -1,0 +1,10 @@
+---
+- name: "Install common utility packages"
+  yum:
+    name: 
+      - "vim"
+      - "nano"
+      - "wget"
+      - "curl"
+      - "bind-utils"
+    state: present

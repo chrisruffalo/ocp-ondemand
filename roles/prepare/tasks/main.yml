@@ -1,7 +1,4 @@
 ---
-# reload hosts/variables for OpenShift installation
-- meta: refresh_inventory
-
 # we need this BYO playbook to continue the run
 - name: "Ensure that the OCP ansible content is at the right version"
   git:

@@ -25,13 +25,13 @@
 # do we already have a EIP registered?
 - name: "Check on already registered EIP"
   stat:
-    path: "./static/eip.yml"
+    path: "./static/{{ safe_instance_name }}/eip.yml"
   register: eip_memory_file
 
 # if so then load the vars
 - name: "Read the EIP value used by the NAT when created"
   include_vars: 
-    file: "./static/eip.yml"
+    file: "./static/{{ safe_instance_name }}/eip.yml"
     name: "nat_eip"
   when: eip_memory_file.stat.exists
 
@@ -43,6 +43,7 @@
     region: "{{ aws_region }}"
     state: absent
     public_ip: "{{ nat_eip.public_ip }}"
+  failed_when: false # just ignore errors
   when: eip_memory_file.stat.exists
   register: nat_eip_delete
 

@@ -1,5 +1,28 @@
-[OSEv3]
+[remote]
 
+[remote:children]
+bastion
+keycloak
+nodes
+
+[centos]
+
+[centos:children]
+bastion
+keycloak
+
+[rhel]
+
+[rhel:children]
+nodes
+
+[tunneled]
+
+[tunneled:children]
+keycloak
+nodes
+
+[OSEv3]
 # Create an OSEv3 group that contains the master, nodes, etcd, and lb groups.
 # The lb group lets Ansible configure HAProxy as the load balancing solution.
 # Comment lb out if your load balancer is pre-configured.
@@ -17,6 +40,7 @@ deployment_type=openshift-enterprise
 # Uncomment the following to enable htpasswd authentication; defaults to
 # DenyAllPasswordIdentityProvider.
 #openshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider', 'filename': '/etc/origin/master/htpasswd'}]
+openshift_master_identity_providers=[{'name': 'keycloak_openid_auth', 'login': 'true', 'challenge': 'true', 'kind': 'OpenIDIdentityProvider', 'clientId': '', clientSecret: '', urls: {'authorize': 'https://login.{{ internal_domain }}/realms/{{ safe_instance_name }}/protocol/openid-connect/auth', 'token': 'https://login.{{ internal_domain }}/realms/{{ safe_instance_name }}/protocol/openid-connect/token'}}]
 
 # Native high availbility cluster method with optional load balancer.
 # If no lb group is defined installer assumes that a load balancer has
@@ -33,44 +57,40 @@ openshift_master_cluster_public_hostname={{ hosted_zone }}
 
 # host group for masters
 [masters]
-{% for master in groups['master'] %}
-{{ master }} ansible_become=true ansible_ssh_user={{ rhel_user }} ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa" 
-{% endfor %}
+[masters:children]
+masternodes
 
 # host group for etcd
 [etcd]
-{% for master in groups['master'] %}
-{{ master }} ansible_become=true ansible_ssh_user={{ rhel_user }} ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa" 
-{% endfor %}
+[etcd:children]
+masternodes
 
 # no LBs in this environment
 [lb]
 
 # host group for nodes, includes region info
 [nodes]
-{% for master in groups['master'] %}
-{{ master }} openshift_node_labels="{{ hostvars[master]['openshift_node_labels'] }}" openshift_schedulable=false ansible_become=true ansible_ssh_user={{ rhel_user }} ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa" 
+{% for machine in ec2_info.infras %}
+{{  machine.private_ip }} openshift_node_labels={region="infra", zone="ag-{{ machine.tags.availability_group }}"} openshift_schedulable=false ansible_become=true ansible_ssh_user={{ rhel_user }} ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ safe_instance_name }}/identity.id_rsa {{ centos_user }}@{{ ec2_info.bastions[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ safe_instance_name }}/identity.id_rsa"
 {% endfor %}
-{% for infra in groups['infra'] %}
-{{ infra }} openshift_node_labels="{{ hostvars[infra]['openshift_node_labels'] }}" ansible_become=true ansible_ssh_user={{ rhel_user }} ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa" 
+{% for machine in ec2_info.nodes %}
+{{  machine.private_ip }} openshift_node_labels={region="default", zone="ag-{{ machine.tags.availability_group }}"} openshift_schedulable=false ansible_become=true ansible_ssh_user={{ rhel_user }} ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ safe_instance_name }}/identity.id_rsa {{ centos_user }}@{{ ec2_info.bastions[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ safe_instance_name }}/identity.id_rsa"
 {% endfor %}
-{% for node in groups['node'] %}
-{{ node }} openshift_node_labels="{{ hostvars[node]['openshift_node_labels'] }}" ansible_become=true ansible_ssh_user={{ rhel_user }} ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa" 
+
+[nodes:children]
+masternodes
+
+[masternodes]
+{% for machine in ec2_info.masters %}
+{{  machine.private_ip }} openshift_node_labels={region="masters", zone="ag-{{ machine.tags.availability_group }}"} openshift_schedulable=false ansible_become=true ansible_ssh_user={{ rhel_user }} ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ safe_instance_name }}/identity.id_rsa {{ centos_user }}@{{ ec2_info.bastions[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ safe_instance_name }}/identity.id_rsa"
 {% endfor %}
 
 [bastion]
-{% for bastion in groups['bastion'] %}
-{{ bastion }} ansible_ssh_private_key_file="static/{{ instance_name }}.id_rsa" ansible_ssh_user="{{ centos_user }}" ansible_become=true 
+{% for bastion in ec2_info.bastions %}
+{{ bastion.public_ip }} ansible_ssh_private_key_file="static/{{ safe_instance_name }}/identity.id_rsa" ansible_ssh_user="{{ centos_user }}" ansible_become=true 
 {% endfor %}
 
 [keycloak]
-{% for keycloak in groups['keycloak'] %}
-{{ keycloak }} ansible_ssh_private_key_file="static/{{ instance_name }}.id_rsa" ansible_ssh_user="{{ centos_user }}" ansible_become=true ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_result.tagged_instances[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
+{% for keycloak in ec2_info.keycloak %}
+{{ keycloak.private_ip }} ansible_ssh_user="{{ centos_user }}" ansible_become=true ansible_ssh_common_args="-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ safe_instance_name }}/identity.id_rsa {{ centos_user }}@{{ ec2_info.bastions[0].public_ip }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ safe_instance_name }}/identity.id_rsa"
 {% endfor %}
-
-[centos:children]
-bastion
-keycloak
-
-[rhel:children]
-nodes

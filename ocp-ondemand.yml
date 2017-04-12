@@ -6,6 +6,18 @@
 # see more here: https://docs.openshift.com/container-platform/3.4/install_config/install/advanced_install.html#running-the-advanced-installation
 # 
 
+# ensure that localhost has the static folder structure for info that spans multiple runs
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  tags:
+    - "always"
+  tasks:
+    - name: "Ensure static structure is present"
+      file:
+        path: "./static/{{ safe_instance_name }}"
+        state: directory
+
 # create ec2 infrastructure (from localhost, making only needed changes to get the ec2 client running)
 - hosts: localhost
   connection: local
@@ -16,6 +28,18 @@
   roles: 
     - "ec2_spinup"
 
+# load variables if not loaded
+- hosts: all
+  gather_facts: false
+  tags:
+    - "always"
+  tasks:
+    - name: "Load variables if not defined"
+      include_vars: 
+        file: "./static/{{ safe_instance_name }}/ec2_info.yml"
+        name: "ec2_info"
+      when: not ec2_info is defined
+
 # configure bastion host to recieve and execute commands
 - hosts: bastion
   tags:
@@ -23,7 +47,7 @@
     - "bastion"
   roles: 
     - "common"
-    - "ec2_bastion"
+    - "bastion"
 
 # configure keycloak system
 - hosts: keycloak
@@ -43,6 +67,7 @@
     - "post-spinup"
     - "rhel"
     - "subscribe"
+    - "common"
   roles:
     - "rhn_subscribe" # need to attach to rhn before attending to common tasks
   serial: 3 # limit so that RHN doesn't freak out and throw SQL exceptions

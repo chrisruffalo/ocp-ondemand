@@ -134,6 +134,12 @@
     - cidr: 10.0.10.0/24
       az: "{{ aws_region}}a"
       name: "public-1"      
+    - cidr: 10.0.11.0/24
+      az: "{{ aws_region}}b"
+      name: "public-2"
+    - cidr: 10.0.12.0/24
+      az: "{{ aws_region}}c"
+      name: "public-3"            
 
 - name: "Merge subnet results"
   set_fact:
@@ -170,13 +176,13 @@
 # do we already have a EIP registered?
 - name: "Check on already registered EIP"
   stat:
-    path: "./static/eip.yml"
+    path: "./static/{{ safe_instance_name }}/eip.yml"
   register: eip_memory_file
 
 # if so then load the vars
 - name: "If the EIP is already registered then we need to re-use the same EIP address"
   include_vars: 
-    file: "./static/eip.yml"
+    file: "./static/{{ safe_instance_name }}/eip.yml"
     name: "nat_eip_memory"
   when: eip_memory_file.stat.exists
 
@@ -202,7 +208,7 @@
 # statically remember eip because it can't be saved... no tags, no facts about it, no good handle
 - name: "Remember EIP in YAML files"
   copy: 
-    dest: "./static/eip.yml"
+    dest: "./static/{{ safe_instance_name }}/eip.yml"
     content: "---\n{{ nat_eip | to_nice_yaml }}"
   when: nat_eip is defined and nat_eip.changed
 

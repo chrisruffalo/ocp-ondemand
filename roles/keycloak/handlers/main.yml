@@ -4,3 +4,9 @@
   service:
     name: "keycloak"
     state: restarted
+
+# restart nginx
+- name: "restart nginx"
+  service:
+    name: "nginx"
+    state: restarted

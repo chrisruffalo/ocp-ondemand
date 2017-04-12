@@ -38,7 +38,7 @@
       add_host:
         name: "{{ item.private_ip_address }}"
         ansible_ssh_user: "{{ rhel_user }}" 
-        ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ instance_name }}.id_rsa {{ centos_user }}@{{ bastion_instances.instances[0].public_ip_address }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ instance_name }}.id_rsa"
+        ansible_ssh_common_args: "-o ControlMaster=auto -o ControlPersist=30m -o ProxyCommand=\"ssh -i {{ playbook_dir }}/static/{{ safe_instance_name }}/identity.id_rsa {{ centos_user }}@{{ bastion_instances.instances[0].public_ip_address }} -W %h:%p \" -o IdentityFile={{ playbook_dir }}/static/{{ safe_instance_name }}/identity.id_rsa"
         ansible_become: true
         groups: 
           - "{{ instance_name }}"

@@ -1,0 +1,2 @@
+---
+force_spinup: "{{ cli_force_spinup | default(false) | bool }}"
