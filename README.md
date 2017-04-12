@@ -1,4 +1,4 @@
-# On Demand / One-Touch OCP environment in EC2
+# On Demand / Low-Touch OCP environment in EC2
 
 ## Prerequisites
 * Ansible

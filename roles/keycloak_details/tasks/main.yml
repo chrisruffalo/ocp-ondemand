@@ -1,0 +1,21 @@
+---
+# load keycloak details from file
+- name: "Load keycloak details from keycloak_details.yml"
+  include_vars: 
+    file: "./static/{{ safe_instance_name }}/keycloak_details.yml"
+    name: "keycloak_details"
+  register: keycloak_details_loaded
+  when: not keycloak_details is defined
+
+# write aditional host information
+# set up dynamic variables/inventory
+- name: "Copy host authentication variable template"
+  template:
+    dest: "./hosts/ocp_authentication_details"
+    src: "ocp_authentication_details.j2"
+  register: updated_details
+
+# reload if host information was written
+- name: "Reload host information"
+  meta: refresh_inventory
+  when: updated_details.changed

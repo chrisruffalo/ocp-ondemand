@@ -59,6 +59,17 @@
     - "common"
     - "keycloak"
 
+# read keycloak facts and then add host variables as required
+- hosts: localhost
+  connection: local
+  tags:
+    - "all"
+    - "ocp"
+    - "keycloak"
+    - "keycloak_details"
+  roles:
+    - "keycloak_details"
+
 # subscribe rhel hosts 1 at a time
 - hosts: rhel
   gather_facts: false # don't need facts, just do simple subscribe before continuing

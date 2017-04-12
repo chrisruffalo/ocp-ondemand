@@ -24,3 +24,5 @@
 - name: "Attach to pool if required or if subscription was changed"
   command: "subscription-manager attach --pool={{ rhn_pool }}"
   when: pool_status.stdout_lines | length < 1 or subscription_result.changed
+  register: attach_result
+  failed_when: "attach_result.stderr is defined and attach_result.stderr != "" and (not \"Successfully\" in attach_result.stderr)"

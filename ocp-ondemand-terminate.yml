@@ -9,6 +9,11 @@
         path: "./hosts/dynamic"
         state: absent
 
+    - name: "Delete authentication portion"
+      file:
+        path: "./hosts/ocp_authentication_details"
+        state: absent
+
     - name: "Refresh inventory"
       meta: refresh_inventory
 
@@ -59,4 +64,18 @@
   gather_facts: false
   roles:
     - "ec2_spindown"
+
+# delete memory files
+- hosts: localhost
+  connection: local
+  gether_facts: false
+  tasks:
+    - name: "Delete files that store instance details"
+      file:
+        path: "./static/{{ safe_instance_name }}/{{ item }}"
+        state: absent
+      with_items:
+        - "eip.yml"
+        - "ec2_info.yml"
+        - "keycloak_details.yml"
 

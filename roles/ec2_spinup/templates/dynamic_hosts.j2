@@ -37,11 +37,6 @@ lb
 ose_version={{ ocp_version }}
 deployment_type=openshift-enterprise
 
-# Uncomment the following to enable htpasswd authentication; defaults to
-# DenyAllPasswordIdentityProvider.
-#openshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider', 'filename': '/etc/origin/master/htpasswd'}]
-openshift_master_identity_providers=[{'name': 'keycloak_openid_auth', 'login': 'true', 'challenge': 'true', 'kind': 'OpenIDIdentityProvider', 'clientId': '', clientSecret: '', urls: {'authorize': 'https://login.{{ internal_domain }}/realms/{{ safe_instance_name }}/protocol/openid-connect/auth', 'token': 'https://login.{{ internal_domain }}/realms/{{ safe_instance_name }}/protocol/openid-connect/token'}}]
-
 # Native high availbility cluster method with optional load balancer.
 # If no lb group is defined installer assumes that a load balancer has
 # been preconfigured. For installation the value of
