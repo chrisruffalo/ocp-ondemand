@@ -1,10 +1,11 @@
 {
     "name": "keycloak_openid_auth", 
     "login": "true", 
-    "challenge": "true", 
+    "challenge": "false", 
     "kind": "OpenIDIdentityProvider", 
-    "clientId": "{{ keycloak_details.id }}", 
-    "clientSecret": "{{ keycloak_details.secret }}", 
+    "clientID": "{{ keycloak_details.id }}", 
+    "clientSecret": "{{ keycloak_details.secret }}",
+    "mappingMethod": "claim",
     "claims": {
         "id": ["sub"],
         "preferredUsername": ["preferredUsername"],

@@ -24,7 +24,7 @@
   with_items: "{{ desired_repos }}"
 
 - name: "Enable base set of repositories when they are not present"
-  command: "subscription-manager repos --disable=\"*\" {{ repo_subscribe_list }}"
+  command: "subscription-manager repos --disable=\"*\" {{ repo_subscribe_list | join(' ') }}"
   register: subscription_repos
   when: (found_repos | length) != (desired_repos | length)
 
@@ -47,21 +47,15 @@
       - "docker"
       - "atomic-openshift"
       - "atomic-openshift-utils"
-  register: installed_packages
-
-- name: "Ensure excluder packages are installed"
-  yum:
-    state: present
-    name:
       - "atomic-openshift-excluder"
       - "atomic-openshift-docker-excluder"
-  register: excluder_installed_packages
+  register: installed_packages
 
 # remove openshift packages from update exclusion
 - name: "Remove openshift packages from exclusion so that they can be installed"
   command: "atomic-openshift-excluder unexclude"
 
-- name: "Update all packages"
+- name: "Update all packages to the latest version (takes some time)"
   yum:
     name: "*"
     state: latest
@@ -69,22 +63,24 @@
 
 - name: "Clean YUM"
   command: "yum clean all"
+  args:
+    warn: false # yes, we are using yum directly and it is on purpose and the yum module can't do it
   changed_when: false
-  when: installed_packages.changed or updated_packages.changed or excluder_installed_packages.changed
+  when: installed_packages.changed or updated_packages.changed
 
-- name: "Set up Docker to use an insecure registry"
+- name: "Set up Docker to allow insecure registries inside of its own subnet"
   lineinfile:
     path: "/etc/sysconfig/docker"
     regexp: "^OPTIONS"
     line: "OPTIONS='--selinux-enabled --insecure-registry 172.30.0.0/16'"
 
-- name: "Copy docker storage setup configuration"
+- name: "Copy docker storage setup configuration from template"
   template:
     src: "docker-storage-setup.j2"
     dest: "/etc/sysconfig/docker-storage-setup"
   register: storage_template
 
-- name: "Set up Docker storage"
+- name: "Set up Docker storage to use created volume group"
   command: "docker-storage-setup"
   when: ansible_lvm is defined and ((not 'docker-vg' in ansible_lvm.vgs) or storage_template.changed)
 

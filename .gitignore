@@ -4,3 +4,4 @@ static/**
 *.retry
 hosts/dynamic
 hosts/ocp*
+static/openshift-ansible
