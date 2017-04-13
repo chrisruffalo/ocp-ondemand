@@ -6,7 +6,7 @@
   with_items: "{{ infra_instances | map(attribute = 'id') | list }}" 
 
 - set_fact:
-    https_alt_targets: "{{ https_alt_targets | default([]) + [ {'Id': item, 'Port': 443 } ] }}"
+    https_alt_targets: "{{ https_alt_targets | default([]) + [ {'Id': item, 'Port': 8443 } ] }}"
   with_items: "{{ master_instances | map(attribute = 'id') | list }}" 
 
 - name: "Create target for 80"
@@ -19,6 +19,9 @@
     port: 80
     vpc_id: "{{ vpc_result.vpc.id }}"
     targets: "{{ http_targets }}"
+    health_check_path: "/"
+    healthy_threshold_count: 2
+    unhealthy_threshold_count: 10
     state: present
 
 - name: "Create target for 443"
@@ -31,6 +34,7 @@
     port: 443
     vpc_id: "{{ vpc_result.vpc.id }}"
     targets: "{{ https_targets }}"
+    health_check_path: "/"
     healthy_threshold_count: 2
     unhealthy_threshold_count: 10
     state: present
@@ -45,6 +49,7 @@
     port: 8443
     vpc_id: "{{ vpc_result.vpc.id }}"
     targets: "{{ https_alt_targets }}"
+    health_check_path: "/"
     healthy_threshold_count: 2
     unhealthy_threshold_count: 10
     state: present
@@ -90,7 +95,6 @@
 - set_fact:
     keycloak_redirect_targets: "{{ keycloak_redirect_targets | default([]) + [ {'Id': item, 'Port': 80 } ] }}"
     keycloak_http_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 8000 } ] }}"
-    #keycloak_https_targets: "{{ keycloak_http_targets | default([]) + [ {'Id': item, 'Port': 8443 } ] }}"
   with_items: "{{ keycloak_instances | map(attribute = 'id') | list }}"
 
 - name: "Create target for keycloak (so we can do 80 -> redirect -> 443)"    
@@ -103,9 +107,10 @@
     port: 80
     vpc_id: "{{ vpc_result.vpc.id }}"
     targets: "{{ keycloak_redirect_targets }}"
+    health_check_path: "/"
     healthy_threshold_count: 2
     unhealthy_threshold_count: 10
-    successful_response_codes: "200,301" # redirect is also a success code
+    successful_response_codes: "200,201,301" # redirect is also a success code
     state: present
 
 - name: "Create target for keycloak (so we can do 443 -> 8000 -> nginx proxy pass -> 8080)"
@@ -118,9 +123,10 @@
     port: 8000
     vpc_id: "{{ vpc_result.vpc.id }}"
     targets: "{{ keycloak_http_targets }}"
+    health_check_path: "/"
     healthy_threshold_count: 2
     unhealthy_threshold_count: 10
-    successful_response_codes: "200,301" # redirect is also a success code in this case because a health check @ / redirects to /auth    
+    successful_response_codes: "200,201,301" # redirect is also a success code in this case because a health check @ / redirects to /auth    
     state: present
 
 - name: "Create an ALB load balancer for the login/keycloak application"
@@ -166,6 +172,20 @@
     overwrite: true
     ttl: 120
   when: manage_host and cloud_alb_result and cloud_alb_result.load_balancer
+
+# add a cname dns record to {{ hosted_zone }} and *.{{ hosted_zone }} that points to the alb
+- name: "Establish dns wildcard name for cloud hosted applications (based on just-created ALB)"
+  route53:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    command: "create"
+    zone: "{{ hosted_zone }}"
+    record: "master.{{ hosted_zone }}"
+    type: "CNAME"
+    value: "{{ cloud_alb_result.load_balancer.dns_name }}"
+    overwrite: true
+    ttl: 120
+  when: manage_host and cloud_alb_result and cloud_alb_result.load_balancer  
 
 # and to "login.{{ hosted_zone }}"
 - name: "Establish dns name for login (keycloak) service (based on just-created ALB)"

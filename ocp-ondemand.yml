@@ -90,8 +90,8 @@
     - "post-spinup"
     - "rhel"
   roles:
-    - "common"
     - "rhel" # any rhel-specific host stuff
+    - "common" # common packages after rhel repos have been handled
 
 # check out and prepare to execute byo playbook
 - hosts: localhost
@@ -103,7 +103,7 @@
     - "prep"
   roles:
     - "prepare"
- 
+
 # from recent checkout execute the byo configuration script
 - include: "{{ playbook_dir }}/static/openshift-ansible/playbooks/byo/config.yml"
   tags:

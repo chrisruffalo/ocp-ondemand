@@ -2,4 +2,4 @@
 # Uncomment the following to enable htpasswd authentication; defaults to
 # DenyAllPasswordIdentityProvider.
 #openshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider', 'filename': '/etc/origin/master/htpasswd'}]
-openshift_master_identity_providers=[{{ lookup('template', 'ocp_provider_details.json.j2') | to_json | replace('\\n', '') | replace('    ', ' ') }}]
+openshift_master_identity_providers=[{{ lookup('template', 'ocp_provider_details.json.j2') | to_json }}]

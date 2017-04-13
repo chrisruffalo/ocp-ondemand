@@ -81,6 +81,11 @@
   register: client_response
   when: (client_list_response.json is defined) and (client_list_response.json | length > 0)
 
+- name: "Use variable from client response if client responded"
+  set_fact:
+    keycloak_details: "{{ client_response.json }}"
+  when: (client_list_response.json is defined) and (client_list_response.json | length > 0)
+
 - name: "If no client was found then create the client"
   run_once: true
   uri:
@@ -96,10 +101,15 @@
   failed_when: not (client_creation.status == 200 or client_creation.status == 201)
   when: not ((client_list_response.json is defined) and (client_list_response.json | length > 0))
 
-- name: "Merge client information from creation and response"
+- debug:
+    var: client_creation
+  when: client_creation.changed
+
+- name: "Use client creation response for future data"
   run_once: true
   set_fact: 
-    keycloak_details: "{{ client_creation.json if client_creation.json is defined and client_creation.json.id is defined else client_response.json }}"
+    keycloak_details: "{{ client_creation.json }}"
+  when: client_creation.changed
 
 - name: "Get client secret for later so that it can be used for authentication"
   run_once: true

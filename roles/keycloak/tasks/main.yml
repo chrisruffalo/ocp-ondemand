@@ -4,6 +4,20 @@
     name: 
       - "epel-release"
 
+- name: "Attempt to find keycloak details if they already exist"
+  stat:
+    path: "static/{{ safe_instance_name }}/keycloak_details.yml"
+  register: keycloak_details_stat
+
+- name: "Load keycloak_details  if a previous run has made them available"
+  include_vars:
+    file: "./static/{{ safe_instance_name }}/keycloak_details.yml"
+    name: "keycloak_details"
+  when: keycloak_details_stat.stat.exists
+
 # include each piece
 - include: "nginx.yml"
+  when: not keycloak_details is defined and not force_keycloak
+
 - include: "keycloak.yml"
+  when: not keycloak_details is defined and not force_keycloak

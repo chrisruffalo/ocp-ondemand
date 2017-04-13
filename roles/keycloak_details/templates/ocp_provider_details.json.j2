@@ -1,18 +1,18 @@
 {
-    'name': 'keycloak_openid_auth', 
-    'login': 'true', 
-    'challenge': 'true', 
-    'kind': 'OpenIDIdentityProvider', 
-    'clientId': '{{ keycloak_details.id }}', 
-    'clientSecret': '{{ keycloak_details.secret }}', 
-    'claims': {
-        'id': ['sub'],
-        'preferredUsername': ['preferredUsername'],
-        'name': ['name'],
-        'email': ['email']
-    }
-    'urls': {
-        'authorize': 'https://login.{{ hosted_zone }}/realms/{{ safe_instance_name }}/protocol/openid-connect/auth', 
-        'token': 'https://login.{{ hosted_zone }}/realms/{{ safe_instance_name }}/protocol/openid-connect/token'
+    "name": "keycloak_openid_auth", 
+    "login": "true", 
+    "challenge": "true", 
+    "kind": "OpenIDIdentityProvider", 
+    "clientId": "{{ keycloak_details.id }}", 
+    "clientSecret": "{{ keycloak_details.secret }}", 
+    "claims": {
+        "id": ["sub"],
+        "preferredUsername": ["preferredUsername"],
+        "name": ["name"],
+        "email": ["email"]
+    },
+    "urls": {
+        "authorize": "https://login.{{ hosted_zone }}/realms/{{ safe_instance_name }}/protocol/openid-connect/auth", 
+        "token": "https://login.{{ hosted_zone }}/realms/{{ safe_instance_name }}/protocol/openid-connect/token"
     }
 }

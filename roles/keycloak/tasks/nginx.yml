@@ -34,5 +34,13 @@
     owner: root
     group: root
     mode: 644
+  register: template_copied
   notify: 
     - restart nginx
+
+- name: "Start nginx if restart is not changed"
+  service:
+    name: "nginx"
+    state: started
+  when: not template_copied.changed
+

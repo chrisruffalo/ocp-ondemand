@@ -1,2 +1,3 @@
 ---
 force_spinup: "{{ cli_force_spinup | default(false) | bool }}"
+force_keycloak: "{{ cli_force_keycloak | default(false) | bool }}"

@@ -1,7 +1,7 @@
 ---
 # versions
-ocp_version: "3.4" # the version of ocp to use
-ocp_ansible_version: "1.4" # the git release tag/version from the ocp byo content
+ocp_version: "3.5" # the version of ocp to use
+ocp_ansible_version: "1.5" # the git release tag/version from the ocp byo content
 # the minor should match between ocp_version and ocp_ansible_version
 
 # instance name
