@@ -7,4 +7,6 @@
       - "wget"
       - "curl"
       - "bind-utils"
+      - "deltarpm"
+      - "yum-utils"
     state: present

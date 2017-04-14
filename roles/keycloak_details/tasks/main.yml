@@ -1,13 +1,31 @@
 ---
+# look for keycloak details on keycloak host
+- name: "Get keycloak details from keycloak host facts"
+  set_fact:
+    keycloak_details: "{{ hostvars[groups['keycloak'][0]]['keycloak_details'] }}"
+  when: hostvars[groups['keycloak'][0]]['keycloak_details'] is defined
+
+# stat
+- name: "Stat current keycloak details"
+  stat:
+    path: "./static/{{ safe_instance_name }}/keycloak_details.yml"
+  register: keycloak_details_file
+
+# write keycloak details to file
+- name: "Write keycloak details"
+  copy:
+    dest: "{{ playbook_dir }}/static/{{ safe_instance_name }}/keycloak_details.yml" 
+    content: "---\n{{ keycloak_details | to_nice_yaml }}"
+  when: (not keycloak_details_file.stat.exists) and keycloak_details is defined
+
 # load keycloak details from file
 - name: "Load keycloak details from keycloak_details.yml"
   include_vars: 
     file: "./static/{{ safe_instance_name }}/keycloak_details.yml"
     name: "keycloak_details"
   register: keycloak_details_loaded
-  when: not keycloak_details is defined
+  when: keycloak_details_file.stat.exists and (not keycloak_details is defined)
 
-# write aditional host information
 # set up dynamic variables/inventory
 - name: "Copy host authentication variable template"
   template:

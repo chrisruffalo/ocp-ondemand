@@ -35,5 +35,9 @@ You will need to then set up your domain to use the nameservers given by Amazon 
 ### Certificate Creation
 Once you have set up DNS you can create a certificate that can be used in the **region you are hosting your application in**. You would need to create the certificate as being from both the hosted zone and "\*." as a prefix to the hosted zone. Say you used "cloud.rain.org" and "\*.cloud.rain.org". Once you have the certificate created you will need to confirm it in the email you get and then set the `vault_certificate_arn` as the ARN from the certificate.
 
-
+## Planned Features
+* Amazon VPC-contained instance
+* OCP 3.X installation and configuration
+* Keycloak identity management
+* Gluster storage array backend
 

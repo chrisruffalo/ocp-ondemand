@@ -1,6 +1,5 @@
 ---
 - name: "Authenticate with master credentials to the master realm"
-  run_once: true
   uri:  
     method: POST
     url: "http://localhost:8080/auth/realms/master/protocol/openid-connect/token"
@@ -9,7 +8,6 @@
   register: authenticate_response
 
 - name: "Get the realm matching the instance name if it exists"
-  run_once: true
   uri:
     method: GET
     url: "http://localhost:8080/auth/admin/realms/{{ safe_instance_name }}"
@@ -20,7 +18,6 @@
   failed_when: not (realm_response.status == 200 or realm_response.status == 404)
 
 - name: "If the realm is not found then create it"
-  run_once: true
   uri:
     method: POST
     url: "http://localhost:8080/auth/admin/realms"
@@ -35,7 +32,6 @@
   when: "realm_response.status == 404" # when realm is not found
 
 - name: "In that realm look for the client template that will be used for the client"
-  run_once: true
   uri:
     method: GET
     url: "http://localhost:8080/auth/admin/realms/{{ safe_instance_name }}/client-templates/client_template_{{ safe_instance_name }}"
@@ -46,7 +42,6 @@
   failed_when: not (client_template_response.status == 200 or client_template_response.status == 404)
 
 - name: "If the client template is not found then get create it"
-  run_once: true
   uri:
     method: POST
     url: "http://localhost:8080/auth/admin/realms/{{ safe_instance_name }}/client-templates"
@@ -61,7 +56,6 @@
   when: "client_template_response.status == 404" # when client template is not found
 
 - name: "Get the list of clients filtering with the client id so that there will be no response list if the client is not found"
-  run_once: true
   uri:
     method: GET
     url: "http://localhost:8080/auth/admin/realms/{{ safe_instance_name }}/clients?clientId=client_{{ safe_instance_name }}"
@@ -71,7 +65,6 @@
   register: client_list_response
 
 - name: "Use the found client id to get the client details (if a client is found)"
-  run_once: true
   uri:
     method: GET
     url: "http://localhost:8080/auth/admin/realms/{{ safe_instance_name }}/clients/{{ client_list_response.json[0].id }}"
@@ -81,13 +74,7 @@
   register: client_response
   when: (client_list_response.json is defined) and (client_list_response.json | length > 0)
 
-- name: "Use variable from client response if client responded"
-  set_fact:
-    keycloak_details: "{{ client_response.json }}"
-  when: (client_list_response.json is defined) and (client_list_response.json | length > 0)
-
 - name: "If no client was found then create the client"
-  run_once: true
   uri:
     method: POST
     url: "http://localhost:8080/auth/admin/realms/{{ safe_instance_name }}/clients"
@@ -101,18 +88,21 @@
   failed_when: not (client_creation.status == 200 or client_creation.status == 201)
   when: not ((client_list_response.json is defined) and (client_list_response.json | length > 0))
 
-- debug:
-    var: client_creation
-  when: client_creation.changed
+- name: "If the client is freshly created use that information to get the client details not provided by creation"
+  uri:
+    method: GET
+    url: "{{ client_creation.location }}"
+    headers:
+      'Authorization': "{{ authenticate_response.json.token_type }} {{ authenticate_response.json.access_token }}"
+    return_content: true
+  register: post_creation_client_response
+  when: client_creation.changed and client_creation.location is defined
 
-- name: "Use client creation response for future data"
-  run_once: true
+- name: "Create Keycloak details from Keycloak responses"
   set_fact: 
-    keycloak_details: "{{ client_creation.json }}"
-  when: client_creation.changed
+    keycloak_details: "{{ post_creation_client_response.json if client_creation.changed else client_response.json }}"
 
 - name: "Get client secret for later so that it can be used for authentication"
-  run_once: true
   uri:
     method: GET
     url: "http://localhost:8080/auth/admin/realms/{{ safe_instance_name }}/clients/{{ keycloak_details.id }}/client-secret"
@@ -122,26 +112,9 @@
   register: client_secret_response # {type='secret', .value='...'}
 
 - name: "Set client secret for later use"
-  run_once: true
   set_fact:
     keycloak_client_secret: "{{ client_secret_response.json.value }}"
 
 - name: "Consolidate facts for storage"
-  run_once: true
   set_fact:
     keycloak_details: "{{ keycloak_details | combine({'secret': keycloak_client_secret}) }}"
-
-# write facts to external file to preserve for later
-- name: "Write keycloak facts to preserve for later"
-  run_once: true
-  copy: 
-    dest: "/tmp/keycloak_details.yml"
-    content: "---\n{{ keycloak_details | to_nice_yaml }}"
-
-- name: "Fetch keycloak details into a file on localhost"
-  run_once: true
-  fetch:
-    src: "/tmp/keycloak_details.yml"
-    dest: "{{ playbook_dir }}/static/{{ safe_instance_name }}/keycloak_details.yml"
-    flat: true
-    fail_on_missing: true

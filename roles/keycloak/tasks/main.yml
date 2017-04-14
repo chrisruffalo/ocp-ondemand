@@ -8,10 +8,12 @@
   include_vars:
     file: "./static/{{ safe_instance_name }}/keycloak_details.yml"
     name: "keycloak_details"
+  failed_when: false # can't fail, it's ok.. if it doesn't load then we will build keycloak server by hand
+  when: not keycloak_details is defined
 
-# include each piece
+# include each piece if the keycloak details are not complete or if keycloak spinup is forced from the command line
 - include: "nginx.yml"
-  when: not keycloak_details is defined and not force_keycloak
+  when: ((not keycloak_details is defined) or (not keycloak_details.secret is defined)) and (not force_keycloak)
 
 - include: "keycloak.yml"
-  when: not keycloak_details is defined and not force_keycloak
+  when: ((not keycloak_details is defined) or (not keycloak_details.secret is defined)) and (not force_keycloak)

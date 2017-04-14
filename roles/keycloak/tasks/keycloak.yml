@@ -265,3 +265,4 @@
 
 # now that is done, hand over to keycloak administration tasks
 - include: 'keycloak_admin.yml'
+  run_once: true

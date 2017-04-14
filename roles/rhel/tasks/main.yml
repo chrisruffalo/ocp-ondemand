@@ -4,6 +4,7 @@
     desired_repos:
       - "rhel-7-server-rpms"
       - "rhel-7-server-extras-rpms"
+      - "rhel-7-server-ose-3.4-rpms" # last version with openvswitch for atomic-openshift-sdn-ovs
       - "rhel-7-server-ose-{{ ocp_version }}-rpms"
       - "rhel-server-rhscl-7-rpms" #python pip, just in case
     found_repos: []
