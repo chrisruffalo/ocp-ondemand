@@ -80,7 +80,7 @@
     url: "http://localhost:8080/auth/admin/realms/{{ safe_instance_name }}/clients"
     headers:
       'Authorization': "{{ authenticate_response.json.token_type }} {{ authenticate_response.json.access_token }}"
-    body: "{'clientId': 'client_{{ safe_instance_name }}', 'name': 'client_{{ safe_instance_name }}', 'clientTemplate': 'client_template_{{ safe_instance_name }}', 'enabled': true}"
+    body: "{'clientId': 'client_{{ safe_instance_name }}', 'name': 'client_{{ safe_instance_name }}', 'clientTemplate': 'client_template_{{ safe_instance_name }}', 'enabled': true, 'redirectUris': ['https://*.{{ hosted_zone}}/*', 'https://*.{{ hosted_zone}}:8443/*', 'http://*.{{ hosted_zone}}/*'] }"
     body_format: json
     return_content: true
   register: client_creation

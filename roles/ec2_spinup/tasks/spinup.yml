@@ -14,14 +14,17 @@
 # vpc and networking bits
 - include: "01_vpc.yml"
 
-# spin up nodes
-- include: "02_nodes.yml"
+# spin up rds (takes a loooong time)
+- include: "02_rds_start.yml"
 
-# create and manage database instance
-- include: "03_rds.yml"
+# spin up nodes
+- include: "03_nodes.yml"
 
 # set up application load balancing
 - include: "04_alb.yml"
+
+# check on rds and get the value before moving on
+- include: "05_rds_check.yml"
 
 # we need to keep some facts from this run
 # you can get here via: `hostvars['localhost']['ec2_info']` from elsewhere

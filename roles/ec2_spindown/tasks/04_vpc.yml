@@ -74,7 +74,7 @@
     region: "{{ aws_region }}"
     state: absent
     device_id: "{{ item.internet_gateway_id }}"
-  when: item.attachments[0].vpc_id == vpc_id
+  when: igw_facts.internet_gateways is defined and igw_facts.internet_gateways | length > 0 and item.attachments is defined and item.attachments | length > 0 and item.attachments[0].vpc_id == vpc_id
   with_items: "{{ igw_facts.internet_gateways }}"
 
 # remove internet gateway

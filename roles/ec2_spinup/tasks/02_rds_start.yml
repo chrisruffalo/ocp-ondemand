@@ -37,7 +37,7 @@
 # wait for (!!!) minutes
 - name: "Wait for RDS because the wait=true on the create RDS takes longer than the timeout window"
   pause:
-    minutes: 5
+    minutes: 7
   when: keycloak_db_create_result.changed or keycloak_db_create_result.instance.endpoint is not defined
 
 # create RDS for keycloak, this might seem a little weird but this is because we've waited 
