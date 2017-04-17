@@ -1,11 +1,12 @@
 {
-    "name": "keycloak_openid_auth", 
-    "login": "true", 
-    "challenge": "false", 
     "kind": "OpenIDIdentityProvider", 
-    "clientID": "{{ keycloak_details.id }}", 
+    "name": "keycloak_openid_auth_{{ safe_instance_name }}", 
+    "login": "true", 
+    "challenge": "false",
+    "clientID": "client_{{ safe_instance_name }}",
     "clientSecret": "{{ keycloak_details.secret }}",
-    "mappingMethod": "claim",
+    "extraScopes": ["email", "profile"],
+    "mappingInfo": "add",
     "claims": {
         "id": ["sub"],
         "preferredUsername": ["preferredUsername"],
@@ -13,7 +14,8 @@
         "email": ["email"]
     },
     "urls": {
-        "authorize": "https://login.{{ hosted_zone }}/realms/{{ safe_instance_name }}/protocol/openid-connect/auth", 
-        "token": "https://login.{{ hosted_zone }}/realms/{{ safe_instance_name }}/protocol/openid-connect/token"
+        "authorize": "https://login.{{ hosted_zone }}/auth/realms/{{ safe_instance_name }}/protocol/openid-connect/auth",
+        "token": "https://login.{{ hosted_zone }}/auth/realms/{{ safe_instance_name }}/protocol/openid-connect/token",
+        "userInfo": "https://login.{{ hosted_zone }}/auth/realms/{{ safe_instance_name }}/protocol/openid-connect/userinfo"
     }
 }

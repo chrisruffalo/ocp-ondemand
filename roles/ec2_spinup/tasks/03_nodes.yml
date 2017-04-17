@@ -1,5 +1,4 @@
 ---
-
 # create the bastion/jump host and attach elastic ip
 - name: "Create bastion host"
   ec2:

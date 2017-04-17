@@ -1,11 +1,12 @@
 ---
-- rds_subnet_group:
+- name: "Create an RDS network group for the keycloak database"
+  rds_subnet_group:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
     region: "{{ aws_region }}"    
     state: present
     name: "{{ safe_instance_name }}-db-subnet-group"
-    description: My Fancy Ex Parrot Subnet Group
+    description: "subnet group to use as the keycloak database network target"
     subnets:
       - "{{ subnets[0].subnet.id }}"
       - "{{ subnets[1].subnet.id }}"
@@ -33,35 +34,3 @@
       Name: "{{ instance_name }}-keycloak-db"
     maint_window: "Mon:23:00-Tue:03:15"
   register: keycloak_db_create_result
-
-# wait for (!!!) minutes
-- name: "Wait for RDS because the wait=true on the create RDS takes longer than the timeout window"
-  pause:
-    minutes: 7
-  when: keycloak_db_create_result.changed or keycloak_db_create_result.instance.endpoint is not defined
-
-# create RDS for keycloak, this might seem a little weird but this is because we've waited 
-# longer than the timeout window to give this thing time to start up
-- name: "Ensure RDS is created"
-  rds:
-    access_key: "{{ aws_access_key }}"
-    secret_key: "{{ aws_secret_key }}"
-    region: "{{ aws_region }}"    
-    command: create
-    instance_name: "{{ safe_instance_name }}-keycloak-db"
-    db_engine: postgres
-    port: 5432
-    size: 5
-    instance_type: "{{ keycloak_rds_size }}"
-    username: "keycloak"
-    password: "{{ keycloak_db_password }}"
-    subnet: "{{ safe_instance_name }}-db-subnet-group"
-    vpc_security_groups:
-      - "{{ postgres_security_group_result.group_id }}"
-    tags:
-      instance: "{{ instance_name }}"
-      Name: "{{ instance_name }}-keycloak-db"
-    maint_window: "Mon:23:00-Tue:03:15"
-    wait: true
-  retries: 5
-  register: keycloak_db_result

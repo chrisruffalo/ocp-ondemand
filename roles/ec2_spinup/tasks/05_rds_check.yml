@@ -7,7 +7,7 @@
 
 # create RDS for keycloak, this might seem a little weird but this is because we've waited 
 # longer than the timeout window to give this thing time to start up
-- name: "Ensure RDS is created"
+- name: "Check that RDS has been created during ealier phase"
   rds:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
