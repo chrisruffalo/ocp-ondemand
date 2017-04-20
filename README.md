@@ -27,6 +27,7 @@ In order to execute this Ansible content your user needs to have the following p
 * AmazonVPCFullAccess
 * AmazonRoute53FullAccess
 * AmazonRDSFullAccess
+* IAMFullAccess
 
 ### DNS Configuration
 Create (in the Amazon Route53 Domain Management tool) a domain that you will use as the target domain for the "cloud" you are creating. (Say for example I used "cloud.rain.org.") You do not have to buy or register this domain with Amazon and the Ansible content makes sure that the target domain exists in Route53.
