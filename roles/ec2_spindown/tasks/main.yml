@@ -23,6 +23,9 @@
 - include: "04_vpc.yml"
   when: vpc_id is defined # if no vpc then skip the whole vpc section
 
+# remove s3 bucket
+- include: "05_s3.yml"
+
 # remove instance facts
 - name: "Remove instance facts"
   file:

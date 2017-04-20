@@ -1,0 +1,23 @@
+---
+- name: "Ensure s3 bucket is created"
+  s3:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    bucket: "{{ bucket_name }}"
+    mode: create
+    permission: private
+  register: s3_bucket
+
+- debug:
+    var: private_route_table
+
+- name: "Create VPC endpoint for created bucket"
+  ec2_vpc_endpoint:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"
+    vpc_id: 
+    service: "com.amazonaws.ap-{{ region }}.s3"
+    route_table_ids:
+      - "{{ private_route_table.id }}"  

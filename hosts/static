@@ -1,2 +1,26 @@
 [local]
 localhost connection=local
+
+[remote]
+
+[remote:children]
+bastion
+keycloak
+nodes
+
+[centos]
+
+[centos:children]
+bastion
+keycloak
+
+[rhel]
+
+[rhel:children]
+nodes
+
+[tunneled]
+
+[tunneled:children]
+keycloak
+nodes

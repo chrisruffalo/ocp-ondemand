@@ -244,3 +244,4 @@
     routes:
       - dest: 0.0.0.0/0
         gateway_id: "{{ nat_gateway.nat_gateway_id }}"
+  register: private_route_table 

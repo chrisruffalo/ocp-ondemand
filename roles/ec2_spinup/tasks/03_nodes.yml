@@ -56,6 +56,8 @@
       os: "rhel7"
       instance: "{{ instance_name }}"
       availability_group: "{{ item.group }}"
+      s3-allow: true
+      ebs-allow: true
     count_tag:
       Name: "{{ instance_name }}-master-{{ item.group }}" # use the name as the key for the exact count
     exact_count: "{{ item.count }}" # there should only ever be this number running
@@ -95,12 +97,14 @@
     secret_key: "{{ aws_secret_key }}"
     instance_tags: 
       Name: "{{ instance_name }}-infrastructure-{{ item.group }}"
-      type: "infrastructure"
+      type: "infra"
       purpose: "ocp"
       location: "private"
       os: "rhel7"
       instance: "{{ instance_name }}"
       availability_group: "{{ item.group }}"
+      s3-allow: true
+      ebs-allow: true      
     count_tag: 
       Name: "{{ instance_name }}-infrastructure-{{ item.group }}" # use the name as the key for the exact count
     exact_count: "{{ item.count }}" # there should only ever be this number running
@@ -145,6 +149,8 @@
       os: "rhel7"
       instance: "{{ instance_name }}"
       availability_group: "{{ item.group }}"
+      s3-allow: true
+      ebs-allow: true      
     count_tag: 
       Name: "{{ instance_name }}-node-{{ item.group }}" # use the name as the key for the exact count
     exact_count: "{{ item.count }}" # there should only ever be this number running
@@ -269,6 +275,24 @@
     ttl: 7200
     value: "{{ master_host_list }}"
     overwrite: true
+
+- name: "Create domain names for each node by node type"
+  route53:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    zone: "{{ internal_zone }}"
+    vpc_id: "{{ vpc_result.vpc.id }}"
+    private_zone: true
+    command: "create"
+    record: "{{ item.tags.type }}-{{ item.tags.availability_group }}-{{ item.ami_launch_index | int + 1 }}.{{ internal_zone }}"
+    type: "A"
+    ttl: 7200
+    value: "{{ item.private_ip }}"
+    overwrite: true
+  with_items:
+    - "{{ master_instances }}"
+    - "{{ infra_instances }}"
+    - "{{ keycloak_instances }}"
 
 # todo: more internal dns names
 - name: "Wait for bastion host to come up"

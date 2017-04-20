@@ -34,3 +34,18 @@
   shell: "ssh-keygen -y -f static/{{ safe_instance_name }}/{{ instance_name }}.id_rsa > static/{{ safe_instance_name }}/identity.id_rsa.pub"
   args:
     creates: "static/{{ safe_instance_name }}/identity.id_rsa.pub"
+
+# create IAM resources
+- name: "Create IAM role(s) to allow access to EC2 resources from individual cluster machines"
+  iam:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    iam_type: role
+    name: "{{ safe_instance_name }}-iam-{{ item.name }}"
+    state: present
+    trust_policy: "{{ lookup('template', item.file) | to_json }}"
+  with_items:
+    - name: "s3access"
+      file: "s3_iam_policy.json.j2"
+    - name: "ebsaccess"
+      file: "ebs_iam_policy.json.j2"

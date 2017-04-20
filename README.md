@@ -23,6 +23,7 @@ To fully execute this content the following configuration items need to be compl
 ### IAM Group Policies
 In order to execute this Ansible content your user needs to have the following permissions:
 * AmazonEC2FullAccess
+* AmazonS3FullAccess
 * AmazonVPCFullAccess
 * AmazonRoute53FullAccess
 * AmazonRDSFullAccess
@@ -40,4 +41,5 @@ Once you have set up DNS you can create a certificate that can be used in the **
 * OCP 3.X installation and configuration
 * Keycloak identity management
 * Gluster storage array backend
-
+* ELK stack logging consolidation
+* Hawkular metrics consolodiation/reporting

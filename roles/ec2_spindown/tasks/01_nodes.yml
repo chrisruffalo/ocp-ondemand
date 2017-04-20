@@ -16,43 +16,4 @@
     region: "{{ aws_region }}"
     state: absent
     instance_ids: "{{ previous_instance_ec2_facts.instances | map(attribute = 'id') | list }}"
-  when: previous_instance_ec2_facts.instances 
-
-# remove internal DNS entries and zone
-- name: "List all hosted zones"
-  route53_facts:
-    access_key: "{{ aws_access_key }}"
-    secret_key: "{{ aws_secret_key }}"
-    query: hosted_zone
-  register: hosted_zones
-
-#- name: "Get target hosted zone from route53"
-#  set_fact:
-#    hosted_zone_id: "{{ item.id }}"
-#  when:
-#    - vpc_id is defined
-#    - hosted_zones.HostedZones is defined
-#    - vpc_id in item.Config.Comment
-#    - instance_name in item.Config.Comment
-#  with_items: "{{ hosted_zones.HostedZones }}"
-
-#- name: "Get facts about hosted zone entries"
-#  route53_facts:
-#    query: record_sets
-#    hosted_zone_id: "{{ hosted_zone_id[12:] }}"
-#  when:
-#    - vpc_id is defined
-#    - hosted_zone_id is defined    
-#  register: hosted_zone_record_sets
-#
-#- debug:
-#    var: hosted_zone_record_sets
-
-#- name: "Remove internal cloud zone"
-#  route53_zone:
-#    access_key: "{{ aws_access_key }}"
-#    secret_key: "{{ aws_secret_key }}"
-#    zone: "{{ internal_zone }}"
-#    state: absent
-#    vpc_id: "{{ vpc_id }}"
-#  when: vpc_id is defined
+  when: previous_instance_ec2_facts.instances

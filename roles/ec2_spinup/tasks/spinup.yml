@@ -23,8 +23,11 @@
 # set up application load balancing
 - include: "04_alb.yml"
 
+# set up S3 storage for use by parts of the installation
+- include: "05_s3_bucket.yml"
+
 # check on rds and get the value before moving on
-- include: "05_rds_check.yml"
+- include: "06_rds_check.yml"
 
 # we need to keep some facts from this run
 # you can get here via: `hostvars['localhost']['ec2_info']` from elsewhere

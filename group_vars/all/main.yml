@@ -36,15 +36,16 @@ keycloak_db_password: "{{ vault_keycloak_db_password }}"
 # numbers of each available node-type
 master_count: 3 # need 3 to prevent split brain, or go with one
 infra_count: 2 # need 2+
-node_count: 3 # how many hosts you want
+node_count: 3 # how many hosting nodes you want
 
 # node sizes
 bastion_size: "t2.small" #"t2.medium"
-master_size: "t2.medium" #"m3.large" # <- $$ EXPENSIVE $$
-infra_size: "t2.medium" #c3.2xlarge" # <- $$ EXPENSIVE $$
-node_size: "t2.medium" #m4.4xlarge" # <- $$ EXPENSIVE $$
-keycloak_size: "t2.medium"
+master_size: "t2.small" #"t2.medium" #"m3.large" # <- $$ EXPENSIVE $$
+infra_size: "t2.small" #"t2.medium" #c3.2xlarge" # <- $$ EXPENSIVE $$
+node_size: "t2.small" #"t2.medium" #m4.4xlarge" # <- $$ EXPENSIVE $$
+keycloak_size: "t2.small"
 keycloak_rds_size: "db.t2.medium"
+gluster_size: "t2.small"
 
 # zone that hosting will happen from (like cloud.rain.org if you own rain.org)
 manage_host: true # set this to true if it is ok that this script creates a host name entry (does not buy or register a domain)
@@ -55,3 +56,7 @@ internal_zone: "cloud.local" # the root domain internally for host names and ins
 hosted_zone: "{{ vault_hosted_zone }}" # the root domain for external use, vaulted here so it isn't leaked onto git
 # the certificate arn for use by the ALB (application load balancer)
 certificate_arn: "{{ vault_certificate_arn }}"
+
+# s3 storage bucket name, if you get errors or issues you will need to change the name on this to something 
+# that will be more consistently unique
+bucket_name: "{{ safe_instance_name }}-ocp-{{ ocp_version }}"
