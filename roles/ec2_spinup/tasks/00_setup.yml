@@ -40,12 +40,12 @@
   iam:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
-    iam_type: role
+    iam_type: user
     name: "{{ safe_instance_name }}-iam-{{ item.name }}"
     state: present
-    trust_policy: "{{ lookup('template', item.file) | to_json }}"
+    trust_policy: "{{ lookup('template', item.file) | from_yaml }}"
   with_items:
     - name: "s3access"
-      file: "s3_iam_policy.json.j2"
+      file: "s3_iam_policy.yml.j2"
     - name: "ebsaccess"
-      file: "ebs_iam_policy.json.j2"
+      file: "ebs_iam_policy.yml.j2"

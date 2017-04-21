@@ -41,6 +41,7 @@
       keycloak: "{{ keycloak_instances }}"
       keycloak_db: "{{ keycloak_db_result }}"
       subnets: "{{ subnets }}"
+      s3_endpoint: "{{ s3_vpc_endpoint }}"
 
 # write facts to external file to preserve for later
 - name: "Write instance facts to YAML for later use when skipping spinup"

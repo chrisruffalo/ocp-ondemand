@@ -1,0 +1,11 @@
+---
+Version: 1
+Statement:
+  - Effect: Allow
+    Action:
+      - "s3:*"
+    Resource: "arn:aws:s3:::{{ bucket_name }}/*"
+    Condition:
+      - StringEquals:
+          "ec2:ResourceTag/instance": "{{ instance_name }}"
+          "ec2:ResourceTag/s3-allow": "true"

@@ -1,3 +1,27 @@
+[remote]
+
+[remote:children]
+bastion
+keycloak
+nodes
+
+[centos]
+
+[centos:children]
+bastion
+keycloak
+
+[rhel]
+
+[rhel:children]
+nodes
+
+[tunneled]
+
+[tunneled:children]
+keycloak
+nodes
+
 # a good reference with many many more examples
 # https://github.com/openshift/openshift-ansible/blob/master/inventory/byo/hosts.ose.example
 
@@ -23,7 +47,7 @@ deployment_type=openshift-enterprise
 # or to one or all of the masters defined in the inventory if no load
 # balancer is present.
 openshift_master_cluster_method=native
-#openshift_master_cluster_hostname={{ hosted_zone }}
+#openshift_master_cluster_hostname=master.{{ internal_zone }}
 openshift_master_cluster_public_hostname=master.{{ hosted_zone }}
 
 # do not install examples

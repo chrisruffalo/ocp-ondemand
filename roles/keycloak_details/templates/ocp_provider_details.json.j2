@@ -6,7 +6,6 @@
     "clientID": "client_{{ safe_instance_name }}",
     "clientSecret": "{{ keycloak_details.secret }}",
     "extraScopes": ["email", "profile"],
-    "mappingInfo": "add",
     "claims": {
         "id": ["sub"],
         "preferredUsername": ["preferredUsername"],
