@@ -35,7 +35,7 @@ keycloak_db_password: "{{ vault_keycloak_db_password }}"
 
 # numbers of each available node-type
 master_count: 3 # need 3 to prevent split brain, or go with one
-infra_count: 2 # need 2+
+infra_count: 3 # need 3+
 node_count: 3 # how many hosting nodes you want
 
 # node sizes

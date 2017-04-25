@@ -7,8 +7,8 @@
     "clientSecret": "{{ keycloak_details.secret }}",
     "extraScopes": ["email", "profile"],
     "claims": {
-        "id": ["sub"],
-        "preferredUsername": ["preferredUsername"],
+        "id": ["username", "id", "sub"],
+        "preferredUsername": ["username"],
         "name": ["name"],
         "email": ["email"]
     },

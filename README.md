@@ -1,9 +1,13 @@
 # On Demand / Low-Touch OCP environment in EC2
 
+## Architecture
+![Architecture](docs/images/overall_architecture.png)
+
 ## Prerequisites
-* Ansible
-* Money
+* Ansible (>= 2.3)
+* Money ($$$)
 * Git
+* Some EC2 knowledge
 
 ## A WARNING!
 This costs money to do. It spins up a bunch of instances and it will add up quickly. This is not a cheap thing but it aims to be a fast and correct implementation in EC2 from minimal configuration.

@@ -71,6 +71,17 @@ openshift_hosted_registry_storage_provider=s3
 openshift_hosted_registry_storage_s3_bucket={{ bucket_name }}
 openshift_hosted_registry_storage_s3_region={{ aws_region }}
 
+# turn-off cockpit
+osm_use_cockpit=False
+
+# enable dynamic storage configuration
+openshift_master_dynamic_provisioning_enabled=True
+openshift_hosted_metrics_storage_kind=dynamic
+openshift_hosted_logging_storage_kind=dynamic
+
+# enable external URL for metrics
+openshift_hosted_metrics_public_url=https://metrics.{{ hosted_domain }}/hawkular/metrics
+
 # host group for masters
 [masters]
 [masters:children]

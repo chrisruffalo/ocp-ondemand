@@ -4,4 +4,9 @@ static/**
 *.retry
 hosts/dynamic
 hosts/ocp*
+
+# don't keep git module
 static/openshift-ansible
+
+# sample materials
+ec2_sample*yml
