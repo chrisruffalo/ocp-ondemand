@@ -1,7 +1,7 @@
 # On Demand / Low-Touch OCP environment in EC2
 
 ## Architecture
-![Architecture](docs/images/overall_architecture.png)
+![Architecture](docs/images/overall_architecture.png?raw=true)
 
 ## Prerequisites
 * Ansible (>= 2.3)
