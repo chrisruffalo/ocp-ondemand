@@ -177,7 +177,7 @@ def main():
         if vpc_id and 'VPCs' in zone_details:
             # this is to deal with this boto bug: https://github.com/boto/boto/pull/2882
             if isinstance(zone_details['VPCs'], dict):
-                if zone_details['VPCs'][0]['VPCId'] == vpc_id:
+                if zone_details['VPCs']['VPC']['VPCId'] == vpc_id:
                     zones[r53zone['Name']] = zone_id
             else: # Forward compatibility for when boto fixes that bug
                 if vpc_id in [v['VPCId'] for v in zone_details['VPCs']]:
