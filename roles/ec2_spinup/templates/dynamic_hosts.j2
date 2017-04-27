@@ -47,7 +47,7 @@ deployment_type=openshift-enterprise
 # or to one or all of the masters defined in the inventory if no load
 # balancer is present.
 openshift_master_cluster_method=native
-#openshift_master_cluster_hostname=master.{{ internal_zone }}
+openshift_master_cluster_hostname=master.{{ internal_zone }}
 openshift_master_cluster_public_hostname=master.{{ hosted_zone }}
 
 # do not install examples
@@ -80,7 +80,7 @@ openshift_hosted_metrics_storage_kind=dynamic
 openshift_hosted_logging_storage_kind=dynamic
 
 # enable external URL for metrics
-openshift_hosted_metrics_public_url=https://metrics.{{ hosted_domain }}/hawkular/metrics
+openshift_hosted_metrics_public_url=https://metrics.{{ hosted_zone }}/hawkular/metrics
 
 # host group for masters
 [masters]
