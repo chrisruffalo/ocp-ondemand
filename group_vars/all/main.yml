@@ -38,14 +38,13 @@ master_count: 3 # need 3 to prevent split brain, or go with one
 infra_count: 3 # need 3+
 node_count: 3 # how many hosting nodes you want
 
-# node sizes
+# node sizes, fyi t2.small is too small
 bastion_size: "t2.small" #"t2.medium"
-master_size: "t2.small" #"t2.medium" #"m3.large" # <- $$ EXPENSIVE $$
-infra_size: "t2.small" #"t2.medium" #c3.2xlarge" # <- $$ EXPENSIVE $$
-node_size: "t2.small" #"t2.medium" #m4.4xlarge" # <- $$ EXPENSIVE $$
+master_size: "t2.medium" #"m3.large" # <- $$ EXPENSIVE $$
+infra_size: "t2.medium" #c3.2xlarge" # <- $$ EXPENSIVE $$
+node_size: "t2.medium" #m4.4xlarge" # <- $$ EXPENSIVE $$
 keycloak_size: "t2.small"
 keycloak_rds_size: "db.t2.medium"
-gluster_size: "t2.small"
 
 # zone that hosting will happen from (like cloud.rain.org if you own rain.org)
 manage_host: true # set this to true if it is ok that this script creates a host name entry (does not buy or register a domain)
