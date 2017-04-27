@@ -159,11 +159,10 @@
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
     region: "{{ aws_region }}"
-    vpc_id: "{{ vpc_result.vpc.id }}"
+    vpc_id: "{{ vpc_id }}"
     service: "com.amazonaws.{{ aws_region }}.s3"
     route_table_ids:
       - "{{ private_route_table.route_table.id }}"
-  register: s3_vpc_endpoint
 
 # everything is gone, terminate VPC
 - name: "Terminate instance VPC"
