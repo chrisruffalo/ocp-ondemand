@@ -31,7 +31,7 @@
   when: keypair.changed
 
 - name: "Create public key from private key material"
-  shell: "ssh-keygen -y -f static/{{ safe_instance_name }}/{{ instance_name }}.id_rsa > static/{{ safe_instance_name }}/identity.id_rsa.pub"
+  shell: "ssh-keygen -y -f static/{{ safe_instance_name }}/identity.id_rsa > static/{{ safe_instance_name }}/identity.id_rsa.pub"
   args:
     creates: "static/{{ safe_instance_name }}/identity.id_rsa.pub"
 
