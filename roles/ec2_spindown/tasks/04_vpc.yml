@@ -153,14 +153,14 @@
   with_items: "{{ vpc_sec_groups.security_groups }}"
 
 # delete VPC endpoint
-- name: "Delete VPC endpoint for created bucket"
-  extras_ec2_vpc_endpoint:
-    state: absent
-    access_key: "{{ aws_access_key }}"
-    secret_key: "{{ aws_secret_key }}"
-    region: "{{ aws_region }}"
-    vpc_id: "{{ vpc_id }}"
-    service: "com.amazonaws.{{ aws_region }}.s3"
+#- name: "Delete VPC endpoint for created bucket"
+#  extras_ec2_vpc_endpoint:
+#    state: absent
+#    access_key: "{{ aws_access_key }}"
+#    secret_key: "{{ aws_secret_key }}"
+#    region: "{{ aws_region }}"
+#    vpc_id: "{{ vpc_id }}"
+#    service: "com.amazonaws.{{ aws_region }}.s3"
 
 # everything is gone, terminate VPC
 - name: "Terminate instance VPC"

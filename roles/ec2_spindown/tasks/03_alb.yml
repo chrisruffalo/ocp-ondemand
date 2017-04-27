@@ -65,7 +65,7 @@
     state: absent
   when: vpc_id is defined    
 
-- name: "Delete target for keycloak 443 -> 8080"
+- name: "Delete target for keycloak 80 -> redirect -> 443"
   extras_elb_target_group:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
