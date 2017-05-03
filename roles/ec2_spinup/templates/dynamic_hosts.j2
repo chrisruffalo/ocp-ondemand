@@ -49,6 +49,11 @@ deployment_type=openshift-enterprise
 openshift_master_cluster_method=native
 openshift_master_cluster_hostname=master.{{ internal_zone }}
 openshift_master_cluster_public_hostname=master.{{ hosted_zone }}
+openshift_master_default_subdomain=apps.{{ hosted_zone }}
+
+# change master console/api port from 8443 to 443 for direct access
+openshift_master_api_port=443
+openshift_master_console_port=443
 
 # do not install examples
 openshift_install_examples=false
@@ -80,7 +85,7 @@ openshift_hosted_metrics_storage_kind=dynamic
 openshift_hosted_logging_storage_kind=dynamic
 
 # enable external URL for metrics
-openshift_hosted_metrics_public_url=https://metrics.{{ hosted_zone }}/hawkular/metrics
+openshift_hosted_metrics_public_url=https://metrics.apps.{{ hosted_zone }}/hawkular/metrics
 
 # host group for masters
 [masters]

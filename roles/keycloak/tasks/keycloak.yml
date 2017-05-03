@@ -217,6 +217,19 @@
     value: "true"
   register: updated_proxy_forwarding
 
+- name: "Indicate that the proxy can forward SSL certificate information"
+  wildfly_attribute:
+    username: "{{ keycloak_admin_user }}"
+    password: "{{ keycloak_admin_password }}"
+    operation: set
+    address:
+      - "subsystem": "undertow"
+      - "server": "default-server"
+      - "http-listener": "default"
+    key: "certificate-forwarding"
+    value: "true"
+  register: updated_proxy_forwarding
+
 # todo: manipulate configuration for direct ip clustering when more than one keycloak host is present
 
 # start service and wait for it to be started so that changes can be made against the API

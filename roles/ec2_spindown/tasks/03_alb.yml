@@ -10,6 +10,16 @@
     wait: true
   register: alb_remove
 
+- name: "Delete master/infra ALB"
+  extras_elb_application_lb:
+    access_key: "{{ aws_access_key }}"
+    secret_key: "{{ aws_secret_key }}"
+    region: "{{ aws_region }}"    
+    name: "{{ safe_instance_name }}-alb-master-ocp"
+    state: absent
+    wait: true
+  register: master_alb_remove
+
 - name: "Delete keycloak ALB"
   extras_elb_application_lb:
     access_key: "{{ aws_access_key }}"
@@ -23,7 +33,7 @@
 - name: "Pause and wait for ALB to stop and free targets"
   pause:
     seconds: 160
-  when: alb_remove.changed or keycloak_alb_remove.changed
+  when: alb_remove.changed or keycloak_alb_remove.changed or master_alb_remove.changed
 
 - name: "Delete target for 80"
   extras_elb_target_group:
@@ -45,12 +55,12 @@
     state: absent
   when: vpc_id is defined    
 
-- name: "Delete target for 8443"
+- name: "Delete target for master 443"
   extras_elb_target_group:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
     region: "{{ aws_region }}"    
-    name: "{{ safe_instance_name }}-https-alt-group"
+    name: "{{ safe_instance_name }}-https-master-group"
     vpc_id: "{{ vpc_id }}"
     state: absent
   when: vpc_id is defined    

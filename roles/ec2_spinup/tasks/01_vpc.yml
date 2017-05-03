@@ -49,21 +49,6 @@
         from_port: 443
         cidr_ip: 0.0.0.0/0
 
-- name: "Create 8443-allowed security group"
-  ec2_group:
-    access_key: "{{ aws_access_key }}"
-    secret_key: "{{ aws_secret_key }}"
-    description: "allows HTTP and HTTPS access"        
-    name: "{{ instance_name }}-https-alt-allowed"
-    region: "{{ aws_region }}"
-    state: present
-    vpc_id: "{{ vpc_result.vpc.id }}"
-    rules:
-      - proto: tcp
-        to_port: 8443
-        from_port: 8443
-        cidr_ip: 0.0.0.0/0  
-
 - name: "Create 8080-allowed security group"
   ec2_group:
     access_key: "{{ aws_access_key }}"
