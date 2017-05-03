@@ -112,7 +112,7 @@
     region: "{{ aws_region }}"        
     filters:
       "tag:instance": "{{ instance_name }}"
-  when: vpc_net_facts.vpcs    
+  when: vpc_net_facts.vpcs
   register: route_table_facts    
 
 - name: "Delete routing tables"
@@ -125,7 +125,7 @@
     route_table_id: "{{ item.id }}"
     vpc_id: "{{ vpc_id }}"
   with_items: "{{ route_table_facts.route_tables }}"
-  when: route_table_facts.route_tables
+  when: "'route_tables' in route_table_facts and route_table_facts.route_tables"
   register: routing_table_delete_results
 
 - name: "Pause and wait for routing tables to drop"

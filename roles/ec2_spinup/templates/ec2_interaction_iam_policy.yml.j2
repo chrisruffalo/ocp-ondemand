@@ -5,11 +5,12 @@ Statement:
     Principal:
       Service: "ec2.amazonaws.com"
     Action:
-      - "ec2:AttachVolume"
-      - "ec2:DetachVolume"
-      - "ec2:CreateVolume"
-      - "ec2:DeleteVolume"
+      - "ec2:Describe"
+      - "ec2:DescribeInstances"
+      - "ec2:DescribeImages"
+      - "ec2:DescribeKeyPairs"
+      - "ec2:DescribeSecurityGroups"
+      - "ec2:DescribeAvailabilityZones"
     Condition:
       - StringEquals:
           "ec2:ResourceTag/instance": "{{ instance_name }}"
-          "ec2:ResourceTag/ebs-allow": true

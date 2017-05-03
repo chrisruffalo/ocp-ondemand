@@ -40,7 +40,7 @@
   iam:
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
-    iam_type: user
+    iam_type: role
     name: "{{ safe_instance_name }}-iam-{{ item.name }}"
     state: present
     trust_policy: "{{ lookup('template', item.file) | from_yaml }}"
@@ -49,3 +49,5 @@
       file: "s3_iam_policy.yml.j2"
     - name: "ebsaccess"
       file: "ebs_iam_policy.yml.j2"
+    - name: "ec2baseaccess"
+      file: "ec2_interaction_iam_policy.yml.j2"
