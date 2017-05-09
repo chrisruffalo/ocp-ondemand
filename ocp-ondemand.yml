@@ -93,6 +93,15 @@
     - "rhel" # any rhel-specific host stuff
     - "common" # common packages after rhel repos have been handled
 
+# configure nodes
+- hosts: nodes
+  tags: 
+    - "all"
+    - "post-spinup"
+    - "nodes"
+  roles:
+    - "node-pre"
+
 # check out and prepare to execute byo playbook
 - hosts: localhost
   connection: local

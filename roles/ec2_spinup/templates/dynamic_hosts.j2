@@ -67,21 +67,33 @@ openshift_node_kubelet_args={'pods-per-core': ['10'], 'max-pods': ['250'], 'imag
 # override the default controller lease ttl
 #osm_controller_lease_ttl=30
 
+# replicas based on available infrastructure nodes
+openshift_hosted_router_replicas={{ [infra_count, 3] | min }}
+openshift_hosted_registry_replicas={{ [infra_count, 2] | min }}
+
 # set cloud provider, the credentials are not stored because IAM roles are used
 openshift_cloudprovider_kind=aws
+openshift_cloudprovider_aws_access_key={{ aws_access_key }}
+openshift_cloudprovider_aws_secret_key={{ aws_secret_key }}
 
 # registry storage
 openshift_hosted_registry_storage_kind=object
 openshift_hosted_registry_storage_provider=s3
-openshift_hosted_registry_storage_s3_bucket={{ bucket_name }}
+openshift_hosted_registry_storage_s3_bucket={{ bucket_prefix }}-registry
 openshift_hosted_registry_storage_s3_region={{ aws_region }}
+openshift_hosted_registry_storage_s3_accesskey={{ aws_access_key }} 
+openshift_hosted_registry_storage_s3_secretkey={{ aws_secret_key }}
 
 # turn-off cockpit
 osm_use_cockpit=False
 
 # enable dynamic storage configuration
 openshift_master_dynamic_provisioning_enabled=True
+
+openshift_hosted_metrics_deploy=true
 openshift_hosted_metrics_storage_kind=dynamic
+
+openshift_hosted_logging_deploy=true
 openshift_hosted_logging_storage_kind=dynamic
 
 # enable external URL for metrics

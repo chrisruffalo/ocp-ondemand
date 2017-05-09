@@ -43,6 +43,13 @@
       - "centos"
   changed_when: false
 
+# simplify variables
+- name: "simplify host count variables"
+  set_fact:
+    master_initial_count: "{{ (master_count / 3.0) | round(0, 'ceil') | int }}"
+    infra_initial_count: "{{ (infra_count / 3.0) | round(0, 'ceil') | int }}"
+    node_initial_count: "{{ (node_count / 3.0) | round(0, 'ceil') | int }}"
+
 # create OCP target hosts
 - name: "Create master/etcd hosts"
   ec2:
@@ -56,8 +63,7 @@
       os: "rhel7"
       instance: "{{ instance_name }}"
       availability_group: "{{ item.group }}"
-      s3-allow: true
-      ebs-allow: true
+      KubernetesCluster: "{{ instance_name }}"
     count_tag:
       Name: "{{ instance_name }}-master-{{ item.group }}" # use the name as the key for the exact count
     exact_count: "{{ item.count }}" # there should only ever be this number running
@@ -80,14 +86,14 @@
     key_name: "{{ instance_name }}"
     wait: true
   with_items:
-    - count: "{{ (master_count / 3.0) | round(0, 'ceil') | int }}"
+    - count: "{{ master_initial_count }}"
       group: "a"
       subnet: "{{ subnets[0].subnet.id }}"
-    - count: "{{ (master_count / 3.0) | round(0, 'ceil') | int }}"
+    - count: "{{ (((master_count | int) - (master_initial_count | int)) / 2.0) | round(0, 'ceil') | int }}"
       group: "b"
       subnet: "{{ subnets[1].subnet.id }}"
-    - count: "{{ (master_count / 3.0) | round(0, 'floor') | int }}"
-      group: "c"
+    - count: "{{ (((master_count | int) - (master_initial_count | int)) / 2.0) | round(0, 'floor') | int }}"
+      group: "c"  
       subnet: "{{ subnets[2].subnet.id }}"
   register: master_result
 
@@ -103,8 +109,7 @@
       os: "rhel7"
       instance: "{{ instance_name }}"
       availability_group: "{{ item.group }}"
-      s3-allow: true
-      ebs-allow: true      
+      KubernetesCluster: "{{ instance_name }}"
     count_tag: 
       Name: "{{ instance_name }}-infrastructure-{{ item.group }}" # use the name as the key for the exact count
     exact_count: "{{ item.count }}" # there should only ever be this number running
@@ -129,10 +134,10 @@
     - count: "{{ (infra_count / 3.0) | round(0, 'ceil') | int }}"
       group: "a"
       subnet: "{{ subnets[0].subnet.id }}"
-    - count: "{{ (infra_count / 3.0) | round(0, 'ceil') | int }}"
+    - count: "{{ (((infra_count | int) - (infra_initial_count | int)) / 2.0) | round(0, 'ceil') | int }}"
       group: "b"
       subnet: "{{ subnets[1].subnet.id }}"
-    - count: "{{ (infra_count / 3.0) | round(0, 'floor') | int }}"
+    - count: "{{ (((infra_count | int) - (infra_initial_count | int)) / 2.0) | round(0, 'floor') | int }}"  
       group: "c"
       subnet: "{{ subnets[2].subnet.id }}"
   register: infra_result
@@ -149,8 +154,7 @@
       os: "rhel7"
       instance: "{{ instance_name }}"
       availability_group: "{{ item.group }}"
-      s3-allow: true
-      ebs-allow: true      
+      KubernetesCluster: "{{ instance_name }}"
     count_tag: 
       Name: "{{ instance_name }}-node-{{ item.group }}" # use the name as the key for the exact count
     exact_count: "{{ item.count }}" # there should only ever be this number running
@@ -175,10 +179,10 @@
     - count: "{{ (node_count / 3.0) | round(0, 'ceil') | int }}"
       group: "a"
       subnet: "{{ subnets[0].subnet.id }}"
-    - count: "{{ (node_count / 3.0) | round(0, 'ceil') | int }}"
+    - count: "{{ (((node_count | int) - (node_initial_count | int)) / 2.0) | round(0, 'ceil') | int }}"
       group: "b"
       subnet: "{{ subnets[1].subnet.id }}"
-    - count: "{{ (node_count / 3.0) | round(0, 'ceil') | int }}"
+    - count: "{{ (((node_count | int) - (node_initial_count | int)) / 2.0) | round(0, 'floor') | int }}"
       group: "c"
       subnet: "{{ subnets[2].subnet.id }}"      
   register: node_result
@@ -269,7 +273,7 @@
     vpc_id: "{{ vpc_result.vpc.id }}"
     private_zone: true
     command: "create"
-    record: "masters.{{ internal_zone }}"
+    record: "master.{{ internal_zone }}"
     type: "A"
     ttl: 7200
     value: "{{ master_host_list }}"

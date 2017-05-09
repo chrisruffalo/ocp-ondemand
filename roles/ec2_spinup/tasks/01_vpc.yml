@@ -10,6 +10,7 @@
     tags:
       purpose: "ocp"
       instance: "{{ instance_name }}"
+      KubernetesCluster: "{{ instance_name }}"
     dns_support: true
     dns_hostnames: true
   register: vpc_result
@@ -105,6 +106,7 @@
     resource_tags:
       Name: "{{ instance_name }}-{{ item.name }}"
       instance: "{{ instance_name }}"
+      KubernetesCluster: "{{ instance_name }}"
   register: subnet_result
   with_items:
     - cidr: 10.0.1.0/24

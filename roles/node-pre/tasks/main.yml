@@ -1,0 +1,16 @@
+---
+- name: "Ensure AWS configuration directory is created"
+  file:
+    path: "/etc/aws/"
+    state: directory
+    owner: root
+    group: root
+    mode: 755
+
+- name: "Install AWS configuration file"
+  template:
+    src: "aws.conf.j2"
+    dest: "/etc/aws/aws.conf"
+    owner: root
+    group: root
+    mode: 644

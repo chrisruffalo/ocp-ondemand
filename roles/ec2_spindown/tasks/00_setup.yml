@@ -39,4 +39,4 @@
     filters:
       vpc-id: "{{ vpc_id }}"
   when: vpc_net_facts.vpcs
-  register: vpc_subnet_facts
+  register: vpc_subnet_facts  

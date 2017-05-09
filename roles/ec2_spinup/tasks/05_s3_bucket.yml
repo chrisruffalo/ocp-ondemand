@@ -4,7 +4,7 @@
     access_key: "{{ aws_access_key }}"
     secret_key: "{{ aws_secret_key }}"
     region: "{{ aws_region }}"
-    bucket: "{{ bucket_name }}"
+    bucket: "{{ bucket_prefix }}-registry"
     mode: create
     permission: private
   register: s3_bucket
