@@ -173,7 +173,7 @@
     vpc_id: "{{ vpc_id }}"
     service: "com.amazonaws.{{ aws_region }}.s3"
     vpc_endpoint_id: "{{ existing_endpoints.result.VpcEndpoints[0].VpcEndpointId }}"
-  when: result in existing_endpoints
+  when: "'result' in existing_endpoints"
 
 # everything is gone, terminate VPC
 - name: "Terminate instance VPC"

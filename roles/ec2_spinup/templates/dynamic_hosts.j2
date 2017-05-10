@@ -92,9 +92,11 @@ openshift_master_dynamic_provisioning_enabled=True
 
 openshift_hosted_metrics_deploy=true
 openshift_hosted_metrics_storage_kind=dynamic
+openshift_hosted_metrics_storage_volume_size=50Gi
 
 openshift_hosted_logging_deploy=true
 openshift_hosted_logging_storage_kind=dynamic
+openshift_hosted_logging_storage_volume_size=100Gi
 
 # enable external URL for metrics
 openshift_hosted_metrics_public_url=https://metrics.apps.{{ hosted_zone }}/hawkular/metrics
