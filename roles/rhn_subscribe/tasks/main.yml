@@ -1,11 +1,4 @@
 ---
-- name: "Latest RHSM / configuration packages if possible"
-  yum:
-    state: latest
-    name:
-      - "python-rhsm" 
-      - "subscription-manager"
-
 - name: "Quickly gather subscription details"
   shell: "subscription-manager status | grep Overall | awk '{print $3}'"
   register: subscription_status
